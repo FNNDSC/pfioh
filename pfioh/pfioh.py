@@ -85,6 +85,9 @@ class StoreHandler(BaseHTTPRequestHandler):
             'isdir':   b_isDir
         }
 
+        self.send_response(200)
+        self.end_headers()
+
         self.ret_client(d_ret)
         self.qprint(d_ret, comms = 'tx')
 
@@ -774,3 +777,4 @@ def base64_process(**kwargs):
             'status':           True
             # 'decodedBytes':     bytes_decoded
         }
+
