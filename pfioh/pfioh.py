@@ -767,6 +767,9 @@ def base64_process(**kwargs):
         }
 
     if str_action       == "decode":
+        if len(data) % 4:
+            # not a multiple of 4, add padding:
+            data += '=' * (4 - len(data) % 4)
         bytes_decoded     = base64.b64decode(data)
         with open(str_fileToSave, 'wb') as f:
             f.write(bytes_decoded)
