@@ -39,6 +39,13 @@ class TestPfioh(TestCase):
             default = False
         )
         parser.add_argument(
+            '--storeBase',
+            action  = 'store',
+            dest    = 'storeBase',
+            default = '/tmp',
+            help    = 'Base path for internal storage.'
+        )
+        parser.add_argument(
             '--httpResponse',
             help    = 'if specified, return HTTP responses',
             dest    = 'b_httpResponse',
