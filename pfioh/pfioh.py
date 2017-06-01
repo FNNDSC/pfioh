@@ -93,6 +93,9 @@ class StoreHandler(BaseHTTPRequestHandler):
             'isdir':   b_isDir
         }
 
+        self.send_response(200)
+        self.end_headers()
+
         self.ret_client(d_ret)
         self.qprint(d_ret, comms = 'tx')
 
@@ -863,6 +866,9 @@ def base64_process(**kwargs):
         }
 
     if str_action       == "decode":
+        if len(data) % 4:
+            # not a multiple of 4, add padding:
+            data += '=' * (4 - len(data) % 4)
         bytes_decoded     = base64.b64decode(data)
         with open(str_fileToSave, 'wb') as f:
             f.write(bytes_decoded)
@@ -873,3 +879,4 @@ def base64_process(**kwargs):
             'status':           True
             # 'decodedBytes':     bytes_decoded
         }
+
