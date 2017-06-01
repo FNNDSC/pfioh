@@ -14,6 +14,8 @@ from    argparse            import RawTextHelpFormatter
 from    argparse            import ArgumentParser
 from    distutils.sysconfig import get_python_lib
 
+import  pudb
+
 # The following convolutions are necessary to accommodate both
 # development and deployed instances of the 'pfioh.py' module
 # and related dependencies.
@@ -27,7 +29,7 @@ except:
 from    _colors             import Colors
 
 str_defIP = [l for l in ([ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")][:1], [[(s.connect(('8.8.8.8', 53)), s.getsockname()[0], s.close()) for s in [socket.socket(socket.AF_INET, socket.SOCK_DGRAM)]][0][1]]) if l][0][0]
-str_version = "1.1.0"
+str_version = "1.2.0"
 str_desc = Colors.CYAN + """
         __ _       _
        / _(_)     | |
@@ -66,6 +68,21 @@ str_desc = Colors.CYAN + """
               
 """ + Colors.NO_COLOUR
 
+str_historyNotes = Colors.YELLOW + """
+
+    HISTORY
+    -------
+    
+    1 June 2017: v1.2.0
+    o Add internal key-coded storage lookup.
+
+    NOTES:
+    ------
+    o The text 'path' in an action verb triggers hidden behavior!
+
+
+"""
+
 parser  = ArgumentParser(description = str_desc, formatter_class = RawTextHelpFormatter)
 
 parser.add_argument(
@@ -102,6 +119,13 @@ parser.add_argument(
     dest    = 'b_forever',
     action  = 'store_true',
     default = False
+)
+parser.add_argument(
+    '--storeBase',
+    action  = 'store',
+    dest    = 'storeBase',
+    default = '/tmp',
+    help    = 'Base path for internal storage.'
 )
 parser.add_argument(
     '--test',

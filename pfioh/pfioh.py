@@ -33,6 +33,12 @@ except:
 # Horrible global var
 G_b_httpResponse            = False
 
+Gd_internalvar = {
+    'storeBase':        "/tmp",
+    'key':              "<key>",
+    'storeAddress':     ""
+}
+
 class StoreHandler(BaseHTTPRequestHandler):
 
     b_quiet     = False
@@ -40,7 +46,9 @@ class StoreHandler(BaseHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         """
         """
-        b_test  = False
+        global  Gd_internalvar
+        self.d_ctlVar           = Gd_internalvar
+        b_test                  = False
 
         for k,v in kwargs.items():
             if k == 'test': b_test  = True
@@ -221,8 +229,7 @@ class StoreHandler(BaseHTTPRequestHandler):
         b_copyFile          = False
         b_symlink           = False
 
-        d_ret               = {}
-        d_ret['status']     = True
+        d_ret               = {'status': True}
 
         if not d_copy['symlink']:
             if os.path.isdir(str_serverPath):
@@ -268,9 +275,10 @@ class StoreHandler(BaseHTTPRequestHandler):
         d_server            = dict(urllib.parse.parse_qsl(urllib.parse.urlsplit(self.path).query))
         d_meta              = ast.literal_eval(d_server['meta'])
 
-        d_msg               = {}
-        d_msg['action']     = d_server['action']
-        d_msg['meta']       = d_meta
+        d_msg               = {
+                                'action':   d_server['action'],
+                                'meta':     d_meta
+                            }
         d_transport         = d_meta['transport']
 
         self.qprint(self.path, comms = 'rx')
@@ -301,6 +309,97 @@ class StoreHandler(BaseHTTPRequestHandler):
                 'CONTENT_TYPE':     self.headers['Content-Type'],
             }
         )
+
+    def internalctl_varprocess(self, *args, **kwargs):
+        """
+
+        get/set a specific variable as parsed from the meta JSON.
+
+        :param args:
+        :param kwargs:
+        :return:
+        """
+        global Gd_internalvar
+        d_meta      = {}
+        d_ret       = {}
+        str_var     = ''
+        b_status    = False
+
+        for k,v in kwargs.items():
+            if k == 'd_meta':   d_meta  = v
+
+        str_var     = d_meta['var']
+
+        if d_meta:
+            if 'get' in d_meta.keys():
+                d_ret[str_var]          = Gd_internalvar[str_var]
+                b_status                = True
+
+            if 'set' in d_meta.keys():
+                Gd_internalvar[str_var] = d_meta['set']
+                d_ret[str_var]          = d_meta['set']
+                b_status                = True
+
+            if 'compute' in d_meta.keys() and str_var == 'storeAddress':
+                Gd_internalvar[str_var] = '%s/key-%s' % (Gd_internalvar['storeBase'],
+                                                         Gd_internalvar['key'])
+                d_ret[str_var]          = Gd_internalvar[str_var]
+                b_status                = True
+
+        return {'d_ret':    d_ret,
+                'status':   b_status}
+
+    def internalctl_process(self, *args, **kwargs):
+        """
+
+        Process the 'internalctl' action.
+
+             {  "action": "internalctl",
+                     "meta": {
+                            "var":      <internalVar>,
+                            "set":     "/some/new/path"
+                     }
+             }
+
+             {  "action": "internalctl",
+                     "meta": {
+                            "var":      <internalVar>,
+                            "get":      "currentPath"
+                     }
+             }
+
+             {  "action": "internalctl",
+                     "meta": {
+                            "var":      'storeAddress,
+                            "get"/"compute":    ''
+                     }
+             }
+
+
+        <internalVar>: <meta actions>
+
+            * storeBase:    get/set
+            * key:          get/set
+            * storeAddress: get/compute
+
+
+        :param args:
+        :param kwargs:
+        :return:
+        """
+
+        d_request           = {}
+        b_status            = False
+        d_ret               = {
+            'status':   b_status
+        }
+
+        for k,v in kwargs.items():
+            if k == 'request':   d_request   = v
+        if d_request:
+            d_meta  = d_request['meta']
+            d_ret   = self.internalctl_varprocess(d_meta = d_meta)
+        return d_ret
 
     def hello_process(self, *args, **kwargs):
         """
@@ -449,7 +548,6 @@ class StoreHandler(BaseHTTPRequestHandler):
         :return:
         """
 
-        # d_meta              = d_msg['meta']
         d_local             = d_meta['local']
         d_remote            = d_meta['remote']
         d_transport         = d_meta['transport']
@@ -457,13 +555,11 @@ class StoreHandler(BaseHTTPRequestHandler):
 
         str_serverPath      = d_remote['path']
         str_clientPath      = d_local['path']
-        # str_fileToProcess   = str_serverPath
 
         b_copyTree          = False
         b_copyFile          = False
 
-        d_ret               = {}
-        d_ret['status']     = True
+        d_ret               = {'status': True}
 
         if not d_copy['symlink']:
             if os.path.isdir(str_clientPath):
@@ -621,23 +717,26 @@ class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
     def setup(self, **kwargs):
         global G_b_httpResponse
 
-        self.str_fileBase   = "received-"
-        self.LC             = 40
-        self.RC             = 40
-
-        self.str_unpackDir  = "/tmp/unpack"
-        self.b_removeZip    = False
-        self.args           = None
-
-        self.dp             = debug(verbosity=0, level=-1)
-
-        self.str_desc       = 'pfioh\n\n'
+        self.str_desc           = 'pfioh\n\n'
+        self.args               = None
 
         for k,v in kwargs.items():
             if k == 'args': self.args       = v
             if k == 'desc': self.str_desc   = v
 
-        G_b_httpResponse = self.args['b_httpResponse']
+        self.str_fileBase       = "received-"
+        self.str_storeBase      = self.args['storeBase']
+        self.LC                 = 40
+        self.RC                 = 40
+
+        self.str_unpackDir      = "/tmp/unpack"
+        self.b_removeZip        = False
+        self.dp                 = debug(verbosity=0, level=-1)
+
+        print(self.args)
+
+        G_b_httpResponse        = self.args['b_httpResponse']
+        G_str_storeBaseDir      = self.str_storeBase
         print(self.str_desc)
 
         self.col2_print("Listening on address:",    self.args['ip'])
