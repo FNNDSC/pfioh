@@ -1,5 +1,5 @@
 ##############
-pfioh - v1.2.0
+pfioh - v1.2.1
 ##############
 
 .. image:: https://badge.fury.io/py/pman.svg
