@@ -359,22 +359,22 @@ class StoreHandler(BaseHTTPRequestHandler):
 
              {  "action": "internalctl",
                      "meta": {
-                            "var":      <internalVar>,
-                            "set":     "/some/new/path"
+                            "var":              "<internalVar>",
+                            "set":              "/some/new/path"
                      }
              }
 
              {  "action": "internalctl",
                      "meta": {
-                            "var":      <internalVar>,
-                            "get":      "currentPath"
+                            "var":              "<internalVar>",
+                            "get":              "currentPath"
                      }
              }
 
              {  "action": "internalctl",
                      "meta": {
-                            "var":      'storeAddress,
-                            "get"/"compute":    ''
+                            "var":              "storeAddress",
+                            "get"/"compute":    ""
                      }
              }
 
