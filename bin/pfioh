@@ -150,7 +150,7 @@ if args.b_version:
     sys.exit(1)
 
 server          = pfioh.ThreadedHTTPServer((args.ip, args.port), pfioh.StoreHandler)
-server.setup(args = vars(args), desc = str_desc)
+server.setup(args = vars(args), desc = str_desc, ver = str_version)
 
 if args.b_test:
     handler     = pfioh.StoreHandler(test = True)

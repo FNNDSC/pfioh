@@ -34,6 +34,8 @@ except:
 G_b_httpResponse            = False
 
 Gd_internalvar = {
+    'name':             "pfioh",
+    'version':          "",
     'storeBase':        "/tmp",
     'key':              "<key>",
     'storeAddress':     ""
@@ -419,6 +421,7 @@ class StoreHandler(BaseHTTPRequestHandler):
         :return:
         """
 
+        global Gd_internalvar
         self.qprint("hello_process()", comms = 'status')
         b_status            = False
         d_ret               = {}
@@ -428,7 +431,9 @@ class StoreHandler(BaseHTTPRequestHandler):
 
         d_meta  = d_request['meta']
         if 'askAbout' in d_meta.keys():
-            str_askAbout    = d_meta['askAbout']
+            str_askAbout        = d_meta['askAbout']
+            d_ret['name']       = Gd_internalvar['name']
+            d_ret['version']    = Gd_internalvar['version']
             if str_askAbout == 'timestamp':
                 str_timeStamp   = datetime.datetime.today().strftime('%Y%m%d%H%M%S.%f')
                 d_ret['timestamp']              = {}
@@ -717,29 +722,50 @@ class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
         print(Colors.LIGHT_BLUE +
               ('%*s' % (self.RC, str_right)) + Colors.NO_COLOUR)
 
+    def __init__(self, *args, **kwargs):
+        """
+
+        Holder for constructor of class -- allows for explicit setting
+        of member 'self' variables.
+
+        :return:
+        """
+
+        HTTPServer.__init__(self, *args, **kwargs)
+        self.LC             = 40
+        self.RC             = 40
+        self.args           = None
+        self.str_desc       = 'pfioh'
+        self.str_name       = self.str_desc
+        self.str_version    = ""
+        self.str_fileBase   = "received-"
+        self.str_storeBase  = ""
+
+        self.str_unpackDir  = "/tmp/unpack"
+        self.b_removeZip    = False
+
+        self.dp             = debug(verbosity=0, level=-1)
+
     def setup(self, **kwargs):
         global G_b_httpResponse
-
-        self.str_desc           = 'pfioh\n\n'
-        self.args               = None
+        global Gd_internalvar
 
         for k,v in kwargs.items():
-            if k == 'args': self.args       = v
-            if k == 'desc': self.str_desc   = v
+            if k == 'args': self.args           = v
+            if k == 'desc': self.str_desc       = v
+            if k == 'ver':  self.str_version    = v
 
-        self.str_fileBase       = "received-"
-        self.str_storeBase      = self.args['storeBase']
-        self.LC                 = 40
-        self.RC                 = 40
+        self.str_fileBase           = "received-"
+        self.str_storeBase          = self.args['storeBase']
 
-        self.str_unpackDir      = "/tmp/unpack"
-        self.b_removeZip        = False
-        self.dp                 = debug(verbosity=0, level=-1)
+        self.str_unpackDir          = "/tmp/unpack"
+        self.b_removeZip            = False
 
         print(self.args)
 
-        G_b_httpResponse        = self.args['b_httpResponse']
-        G_str_storeBaseDir      = self.str_storeBase
+        G_b_httpResponse            = self.args['b_httpResponse']
+        Gd_internalvar['name']      = self.str_name
+        Gd_internalvar['version']   = self.str_version
         print(self.str_desc)
 
         self.col2_print("Listening on address:",    self.args['ip'])
