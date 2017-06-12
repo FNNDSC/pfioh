@@ -1,5 +1,5 @@
 ##############
-pfioh - v1.2.2
+pfioh - v1.2.3
 ##############
 
 .. image:: https://badge.fury.io/py/pman.svg
@@ -119,7 +119,7 @@ and then run
 
 .. code-block:: bash
 
-    docker run --name pfioh -v /home:/Users --rm -ti fnndsc/pfioh --rawmode 1 --http --port 5010 --listeners 12
+    docker run --name pfioh -v /home:/Users --rm  fnndsc/pfioh --forever --httpResponse
 
 *****
 Usage
