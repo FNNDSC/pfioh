@@ -12,7 +12,7 @@ def readme():
 
 setup(
       name             =   'pfioh',
-      version          =   '1.2.3',
+      version          =   '1.2.4',
       description      =   'Path-and-File-IO-over-HTTP',
       long_description =   readme(),
       author           =   'Rudolph Pienaar',
