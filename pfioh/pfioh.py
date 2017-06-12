@@ -37,8 +37,7 @@ Gd_internalvar = {
     'name':             "pfioh",
     'version':          "",
     'storeBase':        "/tmp",
-    'key':              "<key>",
-    'storeAddress':     ""
+    'key2address':      {}
 }
 
 class StoreHandler(BaseHTTPRequestHandler):
@@ -345,10 +344,12 @@ class StoreHandler(BaseHTTPRequestHandler):
                 d_ret[str_var]          = d_meta['set']
                 b_status                = True
 
-            if 'compute' in d_meta.keys() and str_var == 'storeAddress':
-                Gd_internalvar[str_var] = '%s/key-%s' % (Gd_internalvar['storeBase'],
-                                                         Gd_internalvar['key'])
-                d_ret[str_var]          = Gd_internalvar[str_var]
+            if 'compute' in d_meta.keys() and str_var == 'key2address':
+                str_computeKey          = d_meta['compute']
+                Gd_internalvar['key2address'][str_computeKey]   = '%s/key-%s' % \
+                                                        (Gd_internalvar['storeBase'],
+                                                         str_computeKey)
+                d_ret[str_var]          = Gd_internalvar['key2address'][str_computeKey]
                 b_status                = True
 
         return {'d_ret':    d_ret,
@@ -375,8 +376,8 @@ class StoreHandler(BaseHTTPRequestHandler):
 
              {  "action": "internalctl",
                      "meta": {
-                            "var":              "storeAddress",
-                            "get"/"compute":    ""
+                            "var":              "key2address",
+                            "compute":          "<keyToken>"
                      }
              }
 
