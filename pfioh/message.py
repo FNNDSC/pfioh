@@ -261,8 +261,8 @@ class Message:
             log.verbosity(10)
             log('hello, world\n', debug=5)
 
-            # Simple two-column justifed output can be created by
-            # first printing a message left justifed in a column of
+            # Simple two-column justified output can be created by
+            # first printing a message left justified in a column of
             # width 40 (with no carriage return, i.e. no '\n')
             log('starting process...', lw=40)
             # followed by a right justified message (with a '\n')
