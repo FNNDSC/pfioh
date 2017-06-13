@@ -128,7 +128,7 @@ Usage
 ``pfioh`` usage
 ===============
 
-For ``pfioh`` detailed information, see the `pfioh wiki page <https://github.com/FNNDSC/pman/wiki/pfioh-overview>`_.
+For ``pfioh`` detailed information, see the `pfioh wiki page <https://github.com/FNNDSC/pfioh/wiki/pfioh-overview>`_.
 
 
 
