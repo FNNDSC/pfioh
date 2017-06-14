@@ -22,6 +22,8 @@ import  psutil
 import  os
 import  multiprocessing
 
+import  pudb
+
 # pfioh local dependencies
 try:
     from    ._colors        import Colors
@@ -30,14 +32,14 @@ except:
     from    _colors         import Colors
     from    debug           import debug
 
-# Horrible global var
-G_b_httpResponse            = False
-
+# Global var
 Gd_internalvar = {
-    'name':             "pfioh",
-    'version':          "",
-    'storeBase':        "/tmp",
-    'key2address':      {}
+    'name':                 "pfioh",
+    'version':              "",
+    'storeBase':            "/tmp",
+    'key2address':          {},
+    'httpResponse':         False,
+    'createDirsAsNeeded':   False
 }
 
 class StoreHandler(BaseHTTPRequestHandler):
@@ -74,24 +76,55 @@ class StoreHandler(BaseHTTPRequestHandler):
             if str_comms == "rx":       print(Colors.GREEN  + "---->")
             print(Colors.NO_COLOUR, end="")
 
+    def remoteLocation_resolve(self, d_remote):
+        """
+        Resolve the remote path location
+
+        :param d_remote: the "remote" specification
+        :return: a string representation of the remote path
+        """
+        b_status        = False
+        str_remotePath  = ""
+        if 'path' in d_remote.keys():
+            str_remotePath  = d_remote['path']
+            b_status        = True
+        if 'key' in d_remote.keys():
+            d_ret =  self.storage_resolveBasedOnKey(key = d_remote['key'])
+            if d_ret['status']:
+                b_status        = True
+                str_remotePath  = d_ret['path']
+        return {
+            'status':   b_status,
+            'path':     str_remotePath
+        }
+
     def do_GET_remoteStatus(self, d_msg, **kwargs):
         """
         This method is used to get information about the remote
         server -- for example, is a remote directory/file valid?
         """
+
+        global Gd_internalvar
+
         d_meta              = d_msg['meta']
         d_remote            = d_meta['remote']
 
-        str_serverPath      = d_remote['path']
+        str_serverPath      = self.remoteLocation_resolve(d_remote)['path']
 
         b_isFile            = os.path.isfile(str_serverPath)
         b_isDir             = os.path.isdir(str_serverPath)
         b_exists            = os.path.exists(str_serverPath)
+        b_createdNewDir     = False
+
+        if not b_exists and Gd_internalvar['createDirsAsNeeded']:
+            os.makedirs(str_serverPath)
+            b_createdNewDir = True
 
         d_ret               = {
-            'status':  b_exists,
-            'isfile':  b_isFile,
-            'isdir':   b_isDir
+            'status':           b_exists or b_createdNewDir,
+            'isfile':           b_isFile,
+            'isdir':            b_isDir,
+            'createdNewDir':    b_createdNewDir
         }
 
         self.send_response(200)
@@ -100,7 +133,7 @@ class StoreHandler(BaseHTTPRequestHandler):
         self.ret_client(d_ret)
         self.qprint(d_ret, comms = 'tx')
 
-        return {'status': b_exists}
+        return {'status': b_exists or b_createdNewDir}
 
     def do_GET_withCompression(self, d_msg):
         """
@@ -117,7 +150,7 @@ class StoreHandler(BaseHTTPRequestHandler):
         d_compress          = d_transport['compress']
         d_ret               = {}
 
-        str_serverPath      = d_remote['path']
+        str_serverPath      = self.remoteLocation_resolve(d_remote)['path']
         str_fileToProcess   = str_serverPath
 
         b_cleanup           = False
@@ -225,7 +258,7 @@ class StoreHandler(BaseHTTPRequestHandler):
         d_transport         = d_meta['transport']
         d_copy              = d_transport['copy']
 
-        str_serverPath      = d_remote['path']
+        str_serverPath      = self.remoteLocation_resolve(d_remote)['path']
         str_clientPath      = d_local['path']
         # str_fileToProcess   = str_serverPath
 
@@ -287,6 +320,7 @@ class StoreHandler(BaseHTTPRequestHandler):
 
         self.qprint(self.path, comms = 'rx')
 
+        # pudb.set_trace()
         if 'checkRemote'    in d_transport and d_transport['checkRemote']:
             self.qprint('Getting status on server filesystem...', comms = 'status')
             d_ret = self.do_GET_remoteStatus(d_msg)
@@ -313,6 +347,34 @@ class StoreHandler(BaseHTTPRequestHandler):
                 'CONTENT_TYPE':     self.headers['Content-Type'],
             }
         )
+
+    def storage_resolveBasedOnKey(self, *args, **kwargs):
+        """
+        Associate a 'key' text string to an actual storage location in the filesystem space
+        on which this service has been launched.
+
+        :param args:
+        :param kwargs:
+        :return:
+        """
+        global Gd_internalvar
+        str_key     = ""
+        b_status    = False
+
+        for k,v in kwargs.items():
+            if k == 'key':  str_key = v
+
+        if len(str_key):
+            str_internalLocation    = '%s/key-%s' % \
+                                      (Gd_internalvar['storeBase'],
+                                       str_key)
+            Gd_internalvar['key2address'][str_key]  = str_internalLocation
+            b_status                = True
+
+        return {
+            'status':   b_status,
+            'path':     str_internalLocation
+        }
 
     def internalctl_varprocess(self, *args, **kwargs):
         """
@@ -345,12 +407,9 @@ class StoreHandler(BaseHTTPRequestHandler):
                 b_status                = True
 
             if 'compute' in d_meta.keys() and str_var == 'key2address':
-                str_computeKey          = d_meta['compute']
-                Gd_internalvar['key2address'][str_computeKey]   = '%s/key-%s' % \
-                                                        (Gd_internalvar['storeBase'],
-                                                         str_computeKey)
-                d_ret[str_var]          = Gd_internalvar['key2address'][str_computeKey]
-                b_status                = True
+                d_path                  = self.storage_resolveBasedOnKey(key = d_meta['compute'])
+                d_ret[str_var]          = d_path['path']
+                b_status                = d_path['status']
 
         return {'d_ret':    d_ret,
                 'status':   b_status}
@@ -562,7 +621,7 @@ class StoreHandler(BaseHTTPRequestHandler):
         d_transport         = d_meta['transport']
         d_copy              = d_transport['copy']
 
-        str_serverPath      = d_remote['path']
+        str_serverPath      = self.remoteLocation_resolve(d_remote)['path']
         str_clientPath      = d_local['path']
 
         b_copyTree          = False
@@ -634,10 +693,10 @@ class StoreHandler(BaseHTTPRequestHandler):
         d_remote            = d_meta['remote']
         b_unpack            = False
         # b_serverPath        = False
-        str_unpackBase      = self.server.str_fileBase
-        if 'path' in d_remote:
-            str_unpackPath  = d_remote['path']
-            str_unpackBase  = str_unpackPath + '/'
+        # str_unpackBase      = self.server.str_fileBase
+
+        str_unpackPath      = self.remoteLocation_resolve(d_remote)['path']
+        str_unpackBase  =    str_unpackPath + '/'
 
         d_transport         = d_meta['transport']
         d_compress          = d_transport['compress']
@@ -706,7 +765,8 @@ class StoreHandler(BaseHTTPRequestHandler):
         :param d_ret:
         :return:
         """
-        if not G_b_httpResponse:
+        global Gd_internalvar
+        if not Gd_internalvar['httpResponse']:
             self.wfile.write(json.dumps(d_ret).encode())
         else:
             self.wfile.write(str(Response(json.dumps(d_ret))).encode())
@@ -733,22 +793,22 @@ class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
         """
 
         HTTPServer.__init__(self, *args, **kwargs)
-        self.LC             = 40
-        self.RC             = 40
-        self.args           = None
-        self.str_desc       = 'pfioh'
-        self.str_name       = self.str_desc
-        self.str_version    = ""
-        self.str_fileBase   = "received-"
-        self.str_storeBase  = ""
+        self.LC                                 = 40
+        self.RC                                 = 40
+        self.args                               = None
+        self.str_desc                           = 'pfioh'
+        self.str_name                           = self.str_desc
+        self.str_version                        = ""
+        self.str_fileBase                       = "received-"
+        self.str_storeBase                      = ""
+        self.b_createDirsAsNeeded               = False
 
-        self.str_unpackDir  = "/tmp/unpack"
-        self.b_removeZip    = False
+        self.str_unpackDir                      = "/tmp/unpack"
+        self.b_removeZip                        = False
 
-        self.dp             = debug(verbosity=0, level=-1)
+        self.dp                                 = debug(verbosity=0, level=-1)
 
     def setup(self, **kwargs):
-        global G_b_httpResponse
         global Gd_internalvar
 
         for k,v in kwargs.items():
@@ -756,23 +816,26 @@ class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
             if k == 'desc': self.str_desc       = v
             if k == 'ver':  self.str_version    = v
 
-        self.str_fileBase           = "received-"
-        self.str_storeBase          = self.args['storeBase']
+        self.str_fileBase                       = "received-"
+        self.str_storeBase                      = self.args['storeBase']
+        self.b_createDirsAsNeeded               = self.args['b_createDirsAsNeeded']
 
-        self.str_unpackDir          = "/tmp/unpack"
-        self.b_removeZip            = False
+        self.str_unpackDir                      = self.args['storeBase']
+        self.b_removeZip                        = False
 
-        print(self.args)
+        # print(self.args)
 
-        G_b_httpResponse            = self.args['b_httpResponse']
-        Gd_internalvar['name']      = self.str_name
-        Gd_internalvar['version']   = self.str_version
+        Gd_internalvar['httpResponse']          = self.args['b_httpResponse']
+        Gd_internalvar['name']                  = self.str_name
+        Gd_internalvar['version']               = self.str_version
+        Gd_internalvar['createDirsAsNeeded']    = self.args['b_createDirsAsNeeded']
+        Gd_internalvar['storeBase']             = self.args['storeBase']
         print(self.str_desc)
 
         self.col2_print("Listening on address:",    self.args['ip'])
         self.col2_print("Listening on port:",       self.args['port'])
         self.col2_print("Server listen forever:",   self.args['b_forever'])
-        self.col2_print("Return HTTP responses:",   G_b_httpResponse)
+        self.col2_print("Return HTTP responses:",   self.args['b_httpResponse'])
 
         print(Colors.LIGHT_GREEN + "\n\n\tWaiting for incoming data..." + Colors.NO_COLOUR)
 
