@@ -1,5 +1,5 @@
 ##############
-pfioh - v1.2.4
+pfioh - v1.2.5
 ##############
 
 .. image:: https://badge.fury.io/py/pman.svg
@@ -119,7 +119,7 @@ and then run
 
 .. code-block:: bash
 
-    docker run --name pfioh -v /home:/Users --rm  fnndsc/pfioh --forever --httpResponse
+    docker run --name pfioh -v /home:/Users --rm  fnndsc/pfioh --forever --httpResponse --storeBase=/tmp --createDirsAsNeeded
 
 *****
 Usage

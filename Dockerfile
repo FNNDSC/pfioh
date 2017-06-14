@@ -19,7 +19,7 @@ MAINTAINER fnndsc "dev@babymri.org"
 
 RUN apt-get update \
   && apt-get install -y libssl-dev libcurl4-openssl-dev bsdmainutils vim \
-  && pip3 install --prefix /usr pfioh==1.2.4 \
+  && pip3 install --prefix /usr pfioh==1.2.5 \
   && pip3 install pudb
 
 COPY ./docker-entrypoint.py /dock/docker-entrypoint.py
