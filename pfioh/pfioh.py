@@ -663,6 +663,58 @@ class StoreHandler(BaseHTTPRequestHandler):
 
         return d_ret
 
+    def postop_process(self, **kwargs):
+        """
+        Perform any postoperations once data has been copied/transferred.
+
+        :param kwargs:
+        :return:
+        """
+
+        str_cmd         = ''
+        d_meta          = {}
+        d_postop        = {}
+        d_ret           = {}
+        b_status        = False
+        str_path        = ''
+        str_payloadFile = ''
+        for k,v in kwargs.items():
+            if k == 'meta':         d_meta          = v
+            if k == 'path':         str_path        = v
+            if k == 'payloadFile':  str_payloadFile = v
+
+        str_payloadPath, str_fileOnly   = os.path.split(str_payloadFile)
+        str_unpackDir                   = os.path.splitext(str_fileOnly)[0]
+
+        if 'postop' in d_meta:
+            d_postop = d_meta['postop']
+            if 'cmd' in d_postop.keys():
+                str_cmd     = d_postop['cmd']
+                str_keyPath = ''
+                if 'remote' in d_meta.keys():
+                    str_keyPath = self.remoteLocation_resolve(d_meta['remote'])['path']
+                str_cmd     = str_cmd.replace('%key', str_keyPath)
+                b_status    = True
+                d_ret['cmd']    = str_cmd
+            if 'op' in d_postop.keys():
+                if d_postop['op']   == 'dsplugin':
+                    str_inputPath       = '%s/%s'       % (str_payloadPath, str_unpackDir)
+                    str_incomingPath    = '%s/incoming' % str_payloadPath
+                    str_outgoingPath    = '%s/outgoing' % str_payloadPath
+                    try:
+                        shutil.move(str_inputPath, str_incomingPath)
+                        if not os.path.exists(str_outgoingPath):
+                            os.makedirs(str_outgoingPath)
+                        b_status    = True
+                    except:
+                        d_ret['errormsg']   = 'unable to move %s to %s -- destination already exists' % \
+                                              (str_inputPath, str_incomingPath)
+                    d_ret['op'] = 'dsplugin'
+
+        d_ret['status']     = b_status
+        d_ret['timestamp']  = '%s' % datetime.datetime.now()
+        return d_ret
+
     def do_POST_withCompression(self, **kwargs):
 
         # Parse the form data posted
@@ -716,13 +768,15 @@ class StoreHandler(BaseHTTPRequestHandler):
             try:
                 with open(str_localFile, 'wb') as fh:
                     fh.write(data)
+                d_ret['decode']['status']   = True
+                d_ret['decode']['msg']      = 'base64 decode successful!'
             except:
                 d_ret['decode']['status']   = False
                 d_ret['decode']['msg']      = 'base64 decode unsuccessful!'
-
                 self.ret_client(d_ret)
                 self.qprint(d_ret, comms = 'tx')
                 return d_ret
+            d_ret['decode']['timestamp']  = '%s' % datetime.datetime.now()
         else:
             d_ret['write']   = {}
             with open(str_localFile, 'wb') as fh:
@@ -736,6 +790,7 @@ class StoreHandler(BaseHTTPRequestHandler):
             d_ret['write']['status']    = True
             d_ret['write']['msg']       = 'File written successfully!'
             d_ret['write']['filesize']  = "{:,}".format(os.stat(str_localFile).st_size)
+            d_ret['write']['timestamp'] = '%s' % datetime.datetime.now()
             d_ret['status']             = True
             d_ret['msg']                = d_ret['write']['msg']
         fh.close()
@@ -747,6 +802,11 @@ class StoreHandler(BaseHTTPRequestHandler):
             d_ret['status'] = d_fio['status']
             d_ret['msg']    = d_fio['msg']
             os.remove(str_localFile)
+
+        # pudb.set_trace()
+        d_ret['postop'] = self.postop_process(meta          = d_meta,
+                                              path          = str_unpackPath,
+                                              payloadFile   = str_localFile)
 
         self.send_response(200)
         self.end_headers()
@@ -917,7 +977,8 @@ def zip_process(**kwargs):
         'status':           True,
         'path':             str_localPath,
         'zipmode':          str_mode,
-        'filesize':         "{:,}".format(os.stat(str_zipFileName).st_size)
+        'filesize':         "{:,}".format(os.stat(str_zipFileName).st_size),
+        'timestamp':        '%s' % datetime.datetime.now()
     }
 
 
