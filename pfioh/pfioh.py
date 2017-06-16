@@ -710,6 +710,9 @@ class StoreHandler(BaseHTTPRequestHandler):
                         d_ret['errormsg']   = 'unable to move %s to %s -- destination already exists' % \
                                               (str_inputPath, str_incomingPath)
                     d_ret['op'] = 'dsplugin'
+                    d_ret['inputPath']      = str_inputPath
+                    d_ret['incomingPath']   = str_incomingPath
+                    d_ret['outgoingPath']   = str_outgoingPath
 
         d_ret['status']     = b_status
         d_ret['timestamp']  = '%s' % datetime.datetime.now()
