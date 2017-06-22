@@ -686,8 +686,8 @@ class StoreHandler(BaseHTTPRequestHandler):
         str_payloadPath, str_fileOnly   = os.path.split(str_payloadFile)
         str_unpackDir                   = os.path.splitext(str_fileOnly)[0]
 
-        if 'postop' in d_meta:
-            d_postop = d_meta['postop']
+        if 'specialHandling' in d_meta:
+            d_postop = d_meta['specialHandling']
             if 'cmd' in d_postop.keys():
                 str_cmd     = d_postop['cmd']
                 str_keyPath = ''
@@ -709,7 +709,8 @@ class StoreHandler(BaseHTTPRequestHandler):
                     except:
                         d_ret['errormsg']   = 'unable to move %s to %s -- destination already exists' % \
                                               (str_inputPath, str_incomingPath)
-                    d_ret['op'] = 'dsplugin'
+                    d_ret['op']             = 'dsplugin'
+                    d_ret['shareDir']       = str_payloadPath
                     d_ret['inputPath']      = str_inputPath
                     d_ret['incomingPath']   = str_incomingPath
                     d_ret['outgoingPath']   = str_outgoingPath
