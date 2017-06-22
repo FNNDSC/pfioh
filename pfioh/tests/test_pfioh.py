@@ -52,6 +52,13 @@ class TestPfioh(TestCase):
             action  = 'store_true',
             default = False
         )
+        parser.add_argument(
+            '--createDirsAsNeeded',
+            help    = 'if specified, allow the service to create base storage directories as needed',
+            dest    = 'b_createDirsAsNeeded',
+            action  = 'store_true',
+            default = False
+        )
 
         args            = parser.parse_args()
         args.port       = int(args.port)
