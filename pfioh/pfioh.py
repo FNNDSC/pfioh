@@ -151,6 +151,10 @@ class StoreHandler(BaseHTTPRequestHandler):
         d_ret               = {}
 
         str_serverPath      = self.remoteLocation_resolve(d_remote)['path']
+        d_ret['preop']      = self.preop_process(   meta          = d_meta,
+                                                    path          = str_serverPath)
+        str_serverPath      = d_ret['preop']['outgoingPath']
+
         str_fileToProcess   = str_serverPath
 
         b_cleanup           = False
@@ -663,9 +667,48 @@ class StoreHandler(BaseHTTPRequestHandler):
 
         return d_ret
 
+    def preop_process(self, **kwargs):
+        """
+        Perform any pre-operations relating to a "PULL" request.
+
+        Essentially, for the 'dsplugin' case, this means appenind a string
+        'outgoing' to the remote storage location path.
+
+        """
+
+        d_meta          = {}
+        d_postop        = {}
+        d_ret           = {}
+        b_status        = False
+        str_path        = ''
+        for k,v in kwargs.items():
+            if k == 'meta':         d_meta          = v
+            if k == 'path':         str_path        = v
+
+        if 'specialHandling' in d_meta:
+            d_preop = d_meta['specialHandling']
+            if 'cmd' in d_preop.keys():
+                str_cmd     = d_postop['cmd']
+                str_keyPath = ''
+                if 'remote' in d_meta.keys():
+                    str_keyPath = self.remoteLocation_resolve(d_meta['remote'])['path']
+                str_cmd     = str_cmd.replace('%key', str_keyPath)
+                b_status    = True
+                d_ret['cmd']    = str_cmd
+            if 'op' in d_preop.keys():
+                # pudb.set_trace()
+                if d_preop['op']   == 'dsplugin':
+                    str_outgoingPath        = '%s/outgoing' % str_path
+                    d_ret['op']             = 'dsplugin'
+                    d_ret['outgoingPath']   = str_outgoingPath
+
+        d_ret['status']     = b_status
+        d_ret['timestamp']  = '%s' % datetime.datetime.now()
+        return d_ret
+
     def postop_process(self, **kwargs):
         """
-        Perform any postoperations once data has been copied/transferred.
+        Perform any post-operations relating to a "POST" request.
 
         :param kwargs:
         :return:
