@@ -15,17 +15,20 @@ from    argparse            import ArgumentParser
 from    distutils.sysconfig import get_python_lib
 
 import  pudb
+import  mount_dir
+import  swift_store
 
 # The following convolutions are necessary to accommodate both
 # development and deployed instances of the 'pfioh.py' module
 # and related dependencies.
 sys.path.insert(1, os.path.join(os.path.dirname(__file__), '../pfioh'))
 try:
-    import  pfioh
+    import pfioh
 except:
     sys.path.insert(1, os.path.join(get_python_lib(True, True), 'site-packages'))
     sys.path.insert(1, os.path.join(get_python_lib(True, True), 'site-packages/pfioh'))
-    import  pfioh
+    import pfioh
+
 from    _colors             import Colors
 
 str_defIP   = [l for l in ([ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")][:1], [[(s.connect(('8.8.8.8', 53)), s.getsockname()[0], s.close()) for s in [socket.socket(socket.AF_INET, socket.SOCK_DGRAM)]][0][1]]) if l][0][0]
@@ -127,6 +130,15 @@ parser.add_argument(
     default = '/tmp',
     help    = 'Base path for internal storage.'
 )
+
+parser.add_argument(
+    '--swift-storage',
+    action  = 'store_true',
+    dest    = 'b_swiftStorage',
+    default = False,
+    help    = 'If specified, use Swift as object Storage'
+)
+
 parser.add_argument(
     '--test',
     help    = 'if specified, perform internal tests',
@@ -156,7 +168,11 @@ if args.b_version:
     print("Version: %s" % str_version)
     sys.exit(1)
 
-server          = pfioh.ThreadedHTTPServer((args.ip, args.port), pfioh.StoreHandler)
+if args.b_swiftStorage:
+    server = pfioh.ThreadedHTTPServer((args.ip, args.port), swift_store.SwiftStore)        
+else:
+    server = pfioh.ThreadedHTTPServer((args.ip, args.port), mount_dir.MountDir) 
+
 server.setup(args = vars(args), desc = str_desc, ver = str_version)
 
 if args.b_test:
