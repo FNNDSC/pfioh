@@ -153,7 +153,8 @@ class StoreHandler(BaseHTTPRequestHandler):
         str_serverPath      = self.remoteLocation_resolve(d_remote)['path']
         d_ret['preop']      = self.preop_process(   meta          = d_meta,
                                                     path          = str_serverPath)
-        str_serverPath      = d_ret['preop']['outgoingPath']
+        if d_ret['preop']['status']:
+            str_serverPath      = d_ret['preop']['outgoingPath']
 
         str_fileToProcess   = str_serverPath
 
@@ -701,6 +702,7 @@ class StoreHandler(BaseHTTPRequestHandler):
                     str_outgoingPath        = '%s/outgoing' % str_path
                     d_ret['op']             = 'dsplugin'
                     d_ret['outgoingPath']   = str_outgoingPath
+                    b_status                = True
 
         d_ret['status']     = b_status
         d_ret['timestamp']  = '%s' % datetime.datetime.now()
