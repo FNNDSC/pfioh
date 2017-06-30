@@ -671,7 +671,7 @@ class StoreHandler(BaseHTTPRequestHandler):
         """
         Perform any pre-operations relating to a "PULL" request.
 
-        Essentially, for the 'dsplugin' case, this means appenind a string
+        Essentially, for the 'dsplugin' case, this means appending a string
         'outgoing' to the remote storage location path.
 
         """
