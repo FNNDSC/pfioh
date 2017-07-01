@@ -15,6 +15,7 @@ import  urllib
 import  ast
 import  shutil
 import  datetime
+import  tempfile
 
 import  platform
 import  socket
@@ -995,7 +996,7 @@ def zip_process(**kwargs):
 
     if str_action       == 'zip':
         str_mode        = 'w'
-        str_zipFileName = '%s.zip' % uuid.uuid4()
+        str_zipFileName = '%s/%s.zip' % (tempfile.gettempdir(), uuid.uuid4())
     else:
         str_mode        = 'r'
 
