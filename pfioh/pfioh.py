@@ -523,8 +523,11 @@ class StoreHandler(BaseHTTPRequestHandler):
                 d_ret['echoBack']['msg']        = d_meta['echoBack']
                 b_status                        = True
 
-        return { 'd_ret':   d_ret,
-                 'status':  b_status}
+        return { 'stdout': { 
+                            'd_ret':   d_ret,
+                            'status':  b_status
+                            }
+        }
 
     def do_POST(self, **kwargs):
 
@@ -561,7 +564,10 @@ class StoreHandler(BaseHTTPRequestHandler):
             else:
                 self.qprint("Parsing JSON data...", comms = 'status')
                 d_data              = json.loads(data.decode())
-                d_msg               = d_data['payload']
+                try:
+                    d_msg           = d_data['payload']
+                except:
+                    d_msg           = d_data
 
         self.qprint('d_msg = %s' % d_msg, comms = 'status')
         d_meta              = d_msg['meta']
