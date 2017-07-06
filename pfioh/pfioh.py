@@ -75,7 +75,7 @@ class StoreHandler(BaseHTTPRequestHandler):
             print(msg)
             if str_comms == "tx":       print(Colors.YELLOW + "<----")
             if str_comms == "rx":       print(Colors.GREEN  + "---->")
-            print(Colors.NO_COLOUR, end="")
+            print(Colors.NO_COLOUR, end="", flush=True)
 
     def remoteLocation_resolve(self, d_remote):
         """
@@ -953,7 +953,7 @@ class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
         self.col2_print("Server listen forever:",   self.args['b_forever'])
         self.col2_print("Return HTTP responses:",   self.args['b_httpResponse'])
 
-        print(Colors.LIGHT_GREEN + "\n\n\tWaiting for incoming data..." + Colors.NO_COLOUR)
+        print(Colors.LIGHT_GREEN + "\n\n\tWaiting for incoming data..." + Colors.NO_COLOUR, flush=True)
 
 
 def zipdir(path, ziph, **kwargs):
