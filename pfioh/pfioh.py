@@ -22,7 +22,7 @@ import  socket
 import  psutil
 import  os
 import  multiprocessing
-
+import  inspect
 import  pudb
 
 # pfioh local dependencies
@@ -110,7 +110,10 @@ class StoreHandler(BaseHTTPRequestHandler):
         d_meta              = d_msg['meta']
         d_remote            = d_meta['remote']
 
+        # pudb.set_trace()
+
         str_serverPath      = self.remoteLocation_resolve(d_remote)['path']
+        self.qprint('server path resolves to %s' % str_serverPath)
 
         b_isFile            = os.path.isfile(str_serverPath)
         b_isDir             = os.path.isdir(str_serverPath)
