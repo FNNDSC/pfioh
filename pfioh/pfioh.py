@@ -67,6 +67,8 @@ class StoreHandler(BaseHTTPRequestHandler):
         for k,v in kwargs.items():
             if k == 'comms':    str_comms  = v
 
+        str_caller  = inspect.stack()[1][3]
+
         if not StoreHandler.b_quiet:
             if str_comms == 'status':   print(Colors.PURPLE,    end="")
             if str_comms == 'error':    print(Colors.RED,       end="")
