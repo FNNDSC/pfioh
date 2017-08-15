@@ -51,6 +51,7 @@ class StoreHandler(BaseHTTPRequestHandler):
         """
         """
         global  Gd_internalvar
+        self.__name__           = 'StoreHandler'
         self.d_ctlVar           = Gd_internalvar
         b_test                  = False
 
@@ -71,7 +72,7 @@ class StoreHandler(BaseHTTPRequestHandler):
             if str_comms == 'error':    print(Colors.RED,       end="")
             if str_comms == "tx":       print(Colors.YELLOW + "<----")
             if str_comms == "rx":       print(Colors.GREEN  + "---->")
-            print('%s' % datetime.datetime.now() + " | ",       end="")
+            print('%s' % datetime.datetime.now() + " | "  + self.__name__ + "." + str_caller + '() | ', end="")
             print(msg)
             if str_comms == "tx":       print(Colors.YELLOW + "<----")
             if str_comms == "rx":       print(Colors.GREEN  + "---->")
