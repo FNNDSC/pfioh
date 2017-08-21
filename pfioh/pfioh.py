@@ -74,7 +74,7 @@ class StoreHandler(BaseHTTPRequestHandler):
             if str_comms == 'error':    print(Colors.RED,       end="")
             if str_comms == "tx":       print(Colors.YELLOW + "<----")
             if str_comms == "rx":       print(Colors.GREEN  + "---->")
-            print('%s' % datetime.datetime.now() + " | "  + self.__name__ + "." + str_caller + '() | ', end="")
+            print('%s' % datetime.datetime.now() + " | "  + os.path.basename(__file__) + ':' + self.__name__ + "." + str_caller + '() | ', end="")
             print(msg)
             if str_comms == "tx":       print(Colors.YELLOW + "<----")
             if str_comms == "rx":       print(Colors.GREEN  + "---->")
@@ -186,7 +186,7 @@ class StoreHandler(BaseHTTPRequestHandler):
             d_fio   = zip_process(
                 action  = 'zip',
                 path    = str_serverPath,
-                arcroot = str_serverPath
+                arcroot = str_serverPath + '/'
             )
             d_ret['zip']        = d_fio
             d_ret['status']     = d_fio['status']
@@ -213,7 +213,7 @@ class StoreHandler(BaseHTTPRequestHandler):
             d_fio   = base64_process(
                 action      = 'encode',
                 payloadFile = str_fileToProcess,
-                saveToFile  = str_fileToProcess + ".b64"
+                saveToFile  = os.path.basename(str_fileToProcess) + ".b64"
             )
             d_ret['encode']     = d_fio
             d_ret['status']     = d_fio['status']
@@ -222,7 +222,7 @@ class StoreHandler(BaseHTTPRequestHandler):
             str_fileToProcess   = d_fio['fileProcessed']
             d_ret['encoding']   = {}
             d_ret['encoding']['filesize']   = '%s' % os.stat(str_fileToProcess).st_size
-            str_base64File      = str_fileToProcess
+            str_base64File      = os.path.basename(str_fileToProcess)
 
         with open(str_fileToProcess, 'rb') as fh:
             filesize    = os.stat(str_fileToProcess).st_size
@@ -1009,7 +1009,8 @@ def zip_process(**kwargs):
 
     if str_action       == 'zip':
         str_mode        = 'w'
-        str_zipFileName = '%s/%s.zip' % (tempfile.gettempdir(), uuid.uuid4())
+        str_arcFileName = '%s/%s' % (tempfile.gettempdir(), uuid.uuid4())
+        str_zipFileName = str_arcFileName + '.zip'
     else:
         str_mode        = 'r'
 
@@ -1017,6 +1018,7 @@ def zip_process(**kwargs):
     if str_mode == 'w':
         if os.path.isdir(str_localPath):
             zipdir(str_localPath, ziphandler, arcroot = str_arcroot)
+            # str_zipFileName = shutil.make_archive(str_arcFileName, 'zip', str_localPath)
         else:
             if len(str_arcroot):
                 str_arcname = str_arcroot.split('/')[-1] + str_localPath.split(str_arcroot)[1]
