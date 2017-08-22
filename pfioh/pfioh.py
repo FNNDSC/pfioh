@@ -693,7 +693,7 @@ class StoreHandler(BaseHTTPRequestHandler):
         """
         Perform any pre-operations relating to a "PULL" request.
 
-        Essentially, for the 'dsplugin' case, this means appending a string
+        Essentially, for the 'plugin' case, this means appending a string
         'outgoing' to the remote storage location path.
 
         """
@@ -719,9 +719,9 @@ class StoreHandler(BaseHTTPRequestHandler):
                 d_ret['cmd']    = str_cmd
             if 'op' in d_preop.keys():
                 # pudb.set_trace()
-                if d_preop['op']   == 'dsplugin':
+                if d_preop['op']   == 'plugin':
                     str_outgoingPath        = '%s/outgoing' % str_path
-                    d_ret['op']             = 'dsplugin'
+                    d_ret['op']             = 'plugin'
                     d_ret['outgoingPath']   = str_outgoingPath
                     b_status                = True
 
@@ -743,14 +743,10 @@ class StoreHandler(BaseHTTPRequestHandler):
         d_ret           = {}
         b_status        = False
         str_path        = ''
-        str_payloadFile = ''
+
         for k,v in kwargs.items():
             if k == 'meta':         d_meta          = v
             if k == 'path':         str_path        = v
-            if k == 'payloadFile':  str_payloadFile = v
-
-        str_payloadPath, str_fileOnly   = os.path.split(str_payloadFile)
-        str_unpackDir                   = os.path.splitext(str_fileOnly)[0]
 
         if 'specialHandling' in d_meta:
             d_postop = d_meta['specialHandling']
@@ -763,23 +759,33 @@ class StoreHandler(BaseHTTPRequestHandler):
                 b_status    = True
                 d_ret['cmd']    = str_cmd
             if 'op' in d_postop.keys():
-                if d_postop['op']   == 'dsplugin':
-                    str_inputPath       = '%s/%s'       % (str_payloadPath, str_unpackDir)
-                    str_incomingPath    = '%s/incoming' % str_payloadPath
-                    str_outgoingPath    = '%s/outgoing' % str_payloadPath
-                    try:
-                        shutil.move(str_inputPath, str_incomingPath)
-                        if not os.path.exists(str_outgoingPath):
-                            os.makedirs(str_outgoingPath)
-                        b_status    = True
-                    except:
-                        d_ret['errormsg']   = 'unable to move %s to %s -- destination already exists' % \
-                                              (str_inputPath, str_incomingPath)
-                    d_ret['op']             = 'dsplugin'
-                    d_ret['shareDir']       = str_payloadPath
-                    d_ret['inputPath']      = str_inputPath
+                if d_postop['op']   == 'plugin':
+                    #
+                    # In this case the contents of the keyStore need to be moved to a 
+                    # directory called 'incoming' within that store. In shell, this 
+                    # would amount to:
+                    #
+                    #   mv $str_path /tmp/$str_path
+                    #   mkdir $str_path
+                    #   mv /tmp/$str_path $str_path/incoming
+                    #
+                    str_uuid            = '%s' % uuid.uuid4()
+                    str_tmp             = os.path.join('/tmp', str_uuid)
+                    str_incomingPath    = os.path.join(str_path, 'incoming')
+                    str_outgoingPath    = os.path.join(str_path, 'outgoing')
+                    self.qprint("Moving %s to %s..." % (str_path, str_tmp))
+                    shutil.move(str_path, str_tmp)
+                    self.qprint("Recreating clean path %s..." % str_path)
+                    os.makedirs(str_path)
+                    self.qprint("Moving %s to %s" % (str_tmp, str_incomingPath))
+                    shutil.move(str_tmp, str_incomingPath)
+
+                    d_ret['op']             = 'plugin'
+                    d_ret['shareDir']       = str_path
+                    d_ret['tmpPath']        = str_tmp
                     d_ret['incomingPath']   = str_incomingPath
                     d_ret['outgoingPath']   = str_outgoingPath
+                    b_status                = True
 
         d_ret['status']     = b_status
         d_ret['timestamp']  = '%s' % datetime.datetime.now()
@@ -865,6 +871,7 @@ class StoreHandler(BaseHTTPRequestHandler):
             d_ret['msg']                = d_ret['write']['msg']
         fh.close()
         if b_unpack and d_compress['archive'] == 'zip':
+            # pudb.set_trace()
             d_fio   =   zip_process(action          = 'unzip',
                                     path            = str_unpackPath,
                                     payloadFile     = str_localFile)
@@ -873,10 +880,8 @@ class StoreHandler(BaseHTTPRequestHandler):
             d_ret['msg']    = d_fio['msg']
             os.remove(str_localFile)
 
-        # pudb.set_trace()
         d_ret['postop'] = self.postop_process(meta          = d_meta,
-                                              path          = str_unpackPath,
-                                              payloadFile   = str_localFile)
+                                              path          = str_unpackPath)
 
         self.send_response(200)
         self.end_headers()
