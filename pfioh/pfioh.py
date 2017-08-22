@@ -116,11 +116,15 @@ class StoreHandler(BaseHTTPRequestHandler):
         # pudb.set_trace()
 
         str_serverPath      = self.remoteLocation_resolve(d_remote)['path']
-        self.qprint('server path resolves to %s' % str_serverPath)
+        self.qprint('server path resolves to %s' % str_serverPath, comms = 'status')
 
         b_isFile            = os.path.isfile(str_serverPath)
         b_isDir             = os.path.isdir(str_serverPath)
         b_exists            = os.path.exists(str_serverPath)
+        self.qprint('b_isfile:  %r' % b_isFile, comms = 'status')
+        self.qprint('b_isDir:   %r' % b_isDir,  comms = 'status')
+        self.qprint('b_exists:  %r' % b_exists, comms = 'status')
+
         b_createdNewDir     = False
 
         if not b_exists and Gd_internalvar['createDirsAsNeeded']:
@@ -183,10 +187,13 @@ class StoreHandler(BaseHTTPRequestHandler):
         # of the local path
         if b_zip:
             self.qprint("Zipping target '%s'..." % str_serverPath, comms = 'status')
+            str_dirSuffix   = ""
+            if os.path.isdir(str_serverPath):
+                str_dirSuffix   = '/'
             d_fio   = zip_process(
                 action  = 'zip',
                 path    = str_serverPath,
-                arcroot = str_serverPath + '/'
+                arcroot = str_serverPath + str_dirSuffix
             )
             d_ret['zip']        = d_fio
             d_ret['status']     = d_fio['status']
