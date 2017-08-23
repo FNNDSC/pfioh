@@ -543,6 +543,95 @@ class StoreHandler(BaseHTTPRequestHandler):
                             }
         }
 
+    def rmtree_process(self, **kwargs):
+        """
+        Remove (if possible) a directory location either specified directly
+        with a "path" or indirectly with a "key".
+
+        """
+        str_path    = ''
+        str_msg     = ''
+        b_status    = False
+        d_msg       = {}
+        d_ret       = {}
+        for k,v in kwargs.items():
+            if k == 'request':  d_msg   = v
+
+        d_meta      = d_msg['meta']
+        str_path    = self.remoteLocation_resolve(d_meta)['path']
+        if len(str_path):
+            # str_path    = d_meta['path']
+            self.qprint('Will rmtree %s...' % str_path)
+            try:
+                shutil.rmtree(str_path)
+                b_status    = True
+                str_msg     = 'Successfully removed tree %s' % str_path
+                self.qprint(str_msg, comms = 'status')
+            except:
+                b_status    = False
+                str_msg     = 'Could not remove tree %s. Possible permission error or invalid path. Try using action `ls`' % str_path
+                self.qprint(str_msg, comms = 'error')
+        d_ret   = {
+            'status':   b_status,
+            'msg':      str_msg
+        }
+
+        return d_ret
+
+    def ls_process(self, **kwargs):
+        """
+        Return a list of dictionary entries of directory entries of 
+        path or key store.
+        """
+
+        str_path    = ''
+        str_msg     = ''
+        b_status    = False
+        d_msg       = {}
+        d_ret       = {}
+        d_e         = {}
+        d_ls        = {}
+        for k,v in kwargs.items():
+            if k == 'request':  d_msg   = v
+
+        d_meta      = d_msg['meta']
+        str_path    = self.remoteLocation_resolve(d_meta)['path']
+        if 'subdir' in d_meta.keys():
+            str_path    = os.path.join(str_path, d_meta['subdir'])
+        if len(str_path):
+            self.qprint('scandir on  %s...' % str_path)
+            try:
+                for e in os.scandir(str_path):
+                    str_type = ''
+                    if e.is_file():     str_type = 'file'
+                    if e.is_dir():      str_type = 'dir'
+                    if e.is_symlink():  str_type = 'symlink'
+                    d_e = {
+                        'type':     str_type,
+                        'path':     os.path.join(str_path, e.name),
+                        'uid':      e.stat().st_uid,
+                        'gid':      e.stat().st_gid,
+                        'size':     e.stat().st_size,
+                        'mtime':    e.stat().st_mtime,
+                        'ctime':    e.stat().st_ctime,
+                        'atime':    e.stat().st_atime
+                    }
+                    d_ls[e.name]   = d_e
+                b_status    = True
+                str_msg     = 'Successful scandir on %s' % str_path
+                self.qprint(str_msg, comms = 'status')
+            except:
+                b_status    = False
+                str_msg     = 'Could not scandir >%s<. Possible permission error.' % str_path
+                self.qprint(str_msg, comms = 'error')
+        d_ret   = {
+            'status':   b_status,
+            'msg':      str_msg,
+            'd_ls':     d_ls
+        }
+
+        return d_ret
+
     def do_POST(self, **kwargs):
 
         b_skipInit  = False
@@ -595,8 +684,14 @@ class StoreHandler(BaseHTTPRequestHandler):
                 try:
                     method      = getattr(self, str_method)
                     d_done      = method(request = d_msg)
-                except  AttributeError:
-                    raise NotImplementedError("Class `{}` does not implement `{}`".format(self.__class__.__name__, method))
+                except:
+                    str_msg     = "Class '{}' does not implement method '{}'".format(self.__class__.__name__, 
+                                                                                     str_method)
+                    d_done = {
+                        'status':   False,
+                        'msg':      str_msg
+                    }
+                    self.qprint(str_msg, comms = 'error')
                 self.qprint(d_done, comms = 'tx')
                 d_ret = d_done
 
