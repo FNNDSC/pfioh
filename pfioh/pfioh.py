@@ -818,7 +818,7 @@ class StoreHandler(BaseHTTPRequestHandler):
                     str_outgoingPath        = '%s/outgoing' % str_path
                     d_ret['op']             = 'plugin'
                     d_ret['outgoingPath']   = str_outgoingPath
-                    shutil.makedirs(str_outgoingPath)
+                    os.makedirs(str_outgoingPath)
                     b_status                = True
 
         d_ret['status']     = b_status
