@@ -162,7 +162,7 @@ class StoreHandler(BaseHTTPRequestHandler):
         d_ret               = {}
 
         str_serverPath      = self.remoteLocation_resolve(d_remote)['path']
-        d_ret['preop']      = self.preop_process(   meta          = d_meta,
+        d_ret['preop']      = self.do_GET_preop(    meta          = d_meta,
                                                     path          = str_serverPath)
         if d_ret['preop']['status']:
             str_serverPath      = d_ret['preop']['outgoingPath']
@@ -258,6 +258,8 @@ class StoreHandler(BaseHTTPRequestHandler):
             if str_encoding == 'base64':
                 self.qprint("Removing '%s'..." % (str_base64File), comms = 'status')
                 if os.path.isfile(str_base64File):  os.remove(str_base64File)
+
+        # d_ret['postop']      = self.do_GET_postop(  meta          = d_meta)
 
         self.ret_client(d_ret)
         self.qprint(d_ret, comms = 'tx')
@@ -784,9 +786,9 @@ class StoreHandler(BaseHTTPRequestHandler):
 
         return d_ret
 
-    def preop_process(self, **kwargs):
+    def do_GET_preop(self, **kwargs):
         """
-        Perform any pre-operations relating to a "PULL" request.
+        Perform any pre-operations relating to a "PULL" or "GET" request.
 
         Essentially, for the 'plugin' case, this means appending a string
         'outgoing' to the remote storage location path and create that dir!
@@ -824,7 +826,53 @@ class StoreHandler(BaseHTTPRequestHandler):
         d_ret['timestamp']  = '%s' % datetime.datetime.now()
         return d_ret
 
-    def postop_process(self, **kwargs):
+    def do_GET_postop(self, **kwargs):
+        """
+        Perform any post-operations relating to a "GET" / "PULL" request.
+
+        :param kwargs:
+        :return:
+        """
+
+        str_cmd         = ''
+        d_meta          = {}
+        d_postop        = {}
+        d_ret           = {}
+        b_status        = False
+        str_path        = ''
+
+        for k,v in kwargs.items():
+            if k == 'meta':         d_meta          = v
+
+        if 'specialHandling' in d_meta:
+            d_postop = d_meta['specialHandling']
+            if 'cleanUp' in d_postop.keys():
+                if d_postop['cleanUp']:
+                    #
+                    # In this case we remove the 'remote' path or key lookup:
+                    #
+                    #   mv $str_path /tmp/$str_path
+                    #   mkdir $str_path
+                    #   mv /tmp/$str_path $str_path/incoming
+                    #
+                    if 'remote' in d_meta.keys():
+                        d_remote = d_meta['remote']
+                    dmsg_rmtree = { 
+                                    'action': 'rmtree',
+                                    'meta'  :  d_remote
+                                    }
+                    self.qprint("Performing GET postop cleanup", comms = 'status')
+                    self.qprint("dmsg_rmtree: %s" % dmsg_rmtree, comms = 'status')
+
+                    d_ret['rmtree']         = self.rmtree_process(request = 'dmsg_rmtree')
+                    d_ret['op']             = 'plugin'
+                    b_status                = d_ret['rmtree']['status']
+
+        d_ret['status']     = b_status
+        d_ret['timestamp']  = '%s' % datetime.datetime.now()
+        return d_ret
+
+    def do_POST_postop(self, **kwargs):
         """
         Perform any post-operations relating to a "POST" request.
 
@@ -976,7 +1024,7 @@ class StoreHandler(BaseHTTPRequestHandler):
             d_ret['msg']    = d_fio['msg']
             os.remove(str_localFile)
 
-        d_ret['postop'] = self.postop_process(meta          = d_meta,
+        d_ret['postop'] = self.do_POST_postop(meta          = d_meta,
                                               path          = str_unpackPath)
 
         self.send_response(200)
