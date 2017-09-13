@@ -16,6 +16,7 @@ import  ast
 import  shutil
 import  datetime
 import  tempfile
+import  pprint
 
 import  platform
 import  socket
@@ -54,6 +55,7 @@ class StoreHandler(BaseHTTPRequestHandler):
         self.__name__           = 'StoreHandler'
         self.d_ctlVar           = Gd_internalvar
         b_test                  = False
+        self.pp                 = pprint.PrettyPrinter(indent=4)
 
         for k,v in kwargs.items():
             if k == 'test': b_test  = True
@@ -259,10 +261,10 @@ class StoreHandler(BaseHTTPRequestHandler):
                 self.qprint("Removing '%s'..." % (str_base64File), comms = 'status')
                 if os.path.isfile(str_base64File):  os.remove(str_base64File)
 
-        # d_ret['postop']      = self.do_GET_postop(  meta          = d_meta)
+        d_ret['postop']      = self.do_GET_postop(  meta          = d_meta)
 
         self.ret_client(d_ret)
-        self.qprint(d_ret, comms = 'tx')
+        self.qprint(self.pp.pformat(d_ret).strip(), comms = 'tx')
 
         return d_ret
 
@@ -563,7 +565,7 @@ class StoreHandler(BaseHTTPRequestHandler):
         str_path    = self.remoteLocation_resolve(d_meta)['path']
         if len(str_path):
             # str_path    = d_meta['path']
-            self.qprint('Will rmtree %s...' % str_path)
+            self.qprint('Will rmtree <%s>; UID %s, eUID %s...' % (str_path, os.getuid(), os.getegid()))
             try:
                 shutil.rmtree(str_path)
                 b_status    = True
@@ -826,6 +828,24 @@ class StoreHandler(BaseHTTPRequestHandler):
         d_ret['timestamp']  = '%s' % datetime.datetime.now()
         return d_ret
 
+    def ls_do(self, **kwargs):
+        """
+        Perform an ls based on the passed args.
+        """
+        for k,v in kwargs.items():
+            if k == 'meta':         d_meta          = v
+
+        if 'remote' in d_meta.keys():
+            d_remote = d_meta['remote']
+            for subdir in ['incoming', 'outgoing']:
+                d_remote['subdir']  = subdir                    
+                dmsg_lstree = { 
+                                'action': 'rmtree',
+                                'meta'  :  d_remote
+                                }
+                d_ls                    = self.ls_process(    request = dmsg_lstree)
+                self.qprint("target ls = \n%s" % self.pp.pformat(d_ls).strip())
+
     def do_GET_postop(self, **kwargs):
         """
         Perform any post-operations relating to a "GET" / "PULL" request.
@@ -857,14 +877,14 @@ class StoreHandler(BaseHTTPRequestHandler):
                     #
                     if 'remote' in d_meta.keys():
                         d_remote = d_meta['remote']
+                    self.ls_do(meta = d_meta)
                     dmsg_rmtree = { 
                                     'action': 'rmtree',
                                     'meta'  :  d_remote
                                     }
                     self.qprint("Performing GET postop cleanup", comms = 'status')
                     self.qprint("dmsg_rmtree: %s" % dmsg_rmtree, comms = 'status')
-
-                    d_ret['rmtree']         = self.rmtree_process(request = 'dmsg_rmtree')
+                    d_ret['rmtree']         = self.rmtree_process(request = dmsg_rmtree)
                     d_ret['op']             = 'plugin'
                     b_status                = d_ret['rmtree']['status']
 
@@ -1033,7 +1053,7 @@ class StoreHandler(BaseHTTPRequestHandler):
         d_ret['User-agent'] = self.headers['user-agent']
 
         # self.ret_client(d_ret)
-        self.qprint(d_ret, comms = 'tx')
+        self.qprint(self.pp.pformat(d_ret).strip(), comms = 'tx')
 
         return d_ret
 
