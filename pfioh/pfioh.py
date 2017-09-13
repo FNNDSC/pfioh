@@ -676,7 +676,7 @@ class StoreHandler(BaseHTTPRequestHandler):
                 except:
                     d_msg           = d_data
 
-        self.qprint('d_msg = %s' % d_msg, comms = 'status')
+        self.qprint('d_msg = %s' % self.pp.pformat(d_msg).strip(), comms = 'status')
         d_meta              = d_msg['meta']
 
         if 'action' in d_msg:
@@ -696,7 +696,7 @@ class StoreHandler(BaseHTTPRequestHandler):
                         'msg':      str_msg
                     }
                     self.qprint(str_msg, comms = 'error')
-                self.qprint(d_done, comms = 'tx')
+                self.qprint(self.pp.pformat(d_done).strip(), comms = 'tx')
                 d_ret = d_done
 
         if 'ctl' in d_meta:
@@ -866,8 +866,8 @@ class StoreHandler(BaseHTTPRequestHandler):
 
         if 'specialHandling' in d_meta:
             d_postop = d_meta['specialHandling']
-            if 'cleanUp' in d_postop.keys():
-                if d_postop['cleanUp']:
+            if 'cleanup' in d_postop.keys():
+                if d_postop['cleanup']:
                     #
                     # In this case we remove the 'remote' path or key lookup:
                     #
