@@ -19,11 +19,8 @@ try:
 except:
     from _colors import Colors
 
-<<<<<<< HEAD
 import pudb
 
-=======
->>>>>>> 176a56fde20c83d4fa510a974e7567855a6ca258
 class MountDir(StoreHandler):
 
     def __init__(self,*args, **kwargs):
@@ -62,7 +59,6 @@ class MountDir(StoreHandler):
                 d_ret['unzip']  = d_fio
                 d_ret['status'] = d_fio['status']
                 d_ret['msg']    = d_fio['msg']
-<<<<<<< HEAD
                 d_ret['write']['filesize']  = "{:,}".format(os.stat(fileName).st_size)
                 os.remove(fileName)
 
@@ -72,14 +68,6 @@ class MountDir(StoreHandler):
         d_ret['write']['msg']       = 'File written successfully!'
         # d_ret['write']['filesize']  = "{:,}".format(fileSize)
         # d_ret['write']['filesize']  = "{:,}".format(os.stat(fileName).st_size)
-=======
-                os.remove(fileName)
-
-        d_ret['write']['file']      = fileName
-        d_ret['write']['status']    = True
-        d_ret['write']['msg']       = 'File written successfully!'
-        d_ret['write']['filesize']  = "{:,}".format(fileSize)
->>>>>>> 176a56fde20c83d4fa510a974e7567855a6ca258
         d_ret['write']['timestamp'] = '%s' % datetime.datetime.now()
         d_ret['status']             = True
         d_ret['msg']                = d_ret['write']['msg']
