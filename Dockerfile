@@ -36,7 +36,11 @@ RUN apt-get update \
   && echo "localuser:localuser" | chpasswd                            \
   && adduser localuser sudo                                           \
   && apt-get install -y libssl-dev libcurl4-openssl-dev bsdmainutils vim net-tools inetutils-ping \
+<<<<<<< HEAD
   && pip3 install --prefix /usr pfioh==1.5.0                          \
+=======
+  && pip3 install --prefix /usr pfioh==1.4.8                          \
+>>>>>>> 176a56fde20c83d4fa510a974e7567855a6ca258
   && pip3 install pudb                                                \
   && pip3 install keystoneauth1                                       \
   && pip3 install python-swiftclient
