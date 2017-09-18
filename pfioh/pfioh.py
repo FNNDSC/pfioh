@@ -134,6 +134,7 @@ class StoreHandler(BaseHTTPRequestHandler):
             b_createdNewDir = True
 
         d_ret               = {
+            'dir':              str_serverPath,
             'status':           b_exists or b_createdNewDir,
             'isfile':           b_isFile,
             'isdir':            b_isDir,
