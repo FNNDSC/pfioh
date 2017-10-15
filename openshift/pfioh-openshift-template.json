@@ -72,7 +72,7 @@
                 "terminationMessagePath": "/dev/termination-log",
                 "volumeMounts": [
                   {
-                    "mount-path": "/etc/swift",
+                    "mountPath": "/etc/swift",
                     "name": "swift-credentials",
                     "readOnly": true
                   }
