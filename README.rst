@@ -17,7 +17,7 @@ pfioh - v1.5.5
 Overview
 ********
 
-This repository provides ``pfioh`` -- a *server* process (think of it as anonymous ``ftp`` that natively understands recursive paths) that allows for file/path push/copy.
+This repository provides ``pfioh`` -- a *server* process (think of it as anonymous ``ftp`` that natively understands recursive paths) that allows for file/path push/copy. This is the bleeding edge dev branch.
 
 - ``pfioh``: a *file* IO manager;
 
