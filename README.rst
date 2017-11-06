@@ -1,6 +1,6 @@
-##################
-pfioh - v1.5.6-dev
-##################
+###################
+pfioh - v1.5.7.dev0
+###################
 
 .. image:: https://badge.fury.io/py/pman.svg
     :target: https://badge.fury.io/py/pman
