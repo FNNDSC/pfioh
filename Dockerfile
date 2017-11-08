@@ -36,9 +36,10 @@ RUN apt-get update \
   && echo "localuser:localuser" | chpasswd                            \
   && adduser localuser sudo                                           \
   && apt-get install -y libssl-dev libcurl4-openssl-dev bsdmainutils vim net-tools inetutils-ping \
-  && pip3 install --prefix /usr pfioh==1.5.7.dev0                      \
+  && pip3 install --prefix /usr pfioh==1.5.8.dev0                      \  
   && pip3 install pudb                                                \
   && pip3 install keystoneauth1                                       \
+  && pip3 install pfmisc==1.0.1                                       \
   && pip3 install python-swiftclient
 
 COPY ./docker-entrypoint.py /dock/docker-entrypoint.py
