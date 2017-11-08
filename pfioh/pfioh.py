@@ -60,7 +60,7 @@ class StoreHandler(BaseHTTPRequestHandler):
         b_test                  = False
 
         self.b_useDebug         = False
-        self.str_debugFile      = '/tmp/pacsretrieve.txt'
+        self.str_debugFile      = '/tmp/pfioh-log.txt'
         self.b_quiet            = True
         self.dp                 = pfmisc.debug(    
                                             verbosity   = 0,
