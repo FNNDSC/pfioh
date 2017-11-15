@@ -47,8 +47,6 @@ class MountDir(StoreHandler):
                 except Exception as err:
                     self.qprint(err)
 
-            fileSize = self.getSize(fileName)
-
         finally:
             if b_zip:
                 d_fio = zip_process(
@@ -59,7 +57,7 @@ class MountDir(StoreHandler):
                 d_ret['unzip']  = d_fio
                 d_ret['status'] = d_fio['status']
                 d_ret['msg']    = d_fio['msg']
-                d_ret['write']['filesize']  = "{:,}".format(os.stat(fileName).st_size)
+                d_ret['write']['filesize']  = "{:,}".format(self.getSize(fileName))
                 os.remove(fileName)
 
         # pudb.set_trace()
@@ -180,4 +178,4 @@ class MountDir(StoreHandler):
         Returns the size of the given file
         """
         
-        return '%s' %os.stat(str_fileToProcess).st_size
+        return os.stat(str_fileToProcess).st_size
