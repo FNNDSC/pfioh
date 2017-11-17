@@ -133,6 +133,7 @@ parser.add_argument(
     help    = 'Base path for internal storage.'
 )
 
+# TODO: change to string arguments for each type of object store
 parser.add_argument(
     '--swift-storage',
     action  = 'store_true',

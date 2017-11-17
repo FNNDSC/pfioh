@@ -2,10 +2,8 @@
 Handle Swift File Storage Option
 """
 
-import ast
 import base64
 import datetime
-import zlib
 import zipfile
 import os
 import configparser
@@ -50,79 +48,66 @@ class SwiftStore(StoreHandler):
         Swift credentials should be stored as a cfg file at /etc/swift 
         """
 
-        for k,v in kwargs:
-            if k == 'configPath': configPath= v
+        str_configPath = '/etc/swift/swift-credentials.cfg'
 
-        configPath = '/etc/swift/swift-credentials.cfg'
+        for k,v in kwargs:
+            if k == 'configPath': str_configPath= v
 
         config = configparser.ConfigParser()
         try:
-            f = open(configPath, 'r')
+            f = open(str_configPath, 'r')
             config.readfp(f)
         finally:
             f.close()
         
-        osAuthUrl           = config['AUTHORIZATION']['osAuthUrl']
-        username            = config['AUTHORIZATION']['username']
-        password            = config['AUTHORIZATION']['password']
-        osProjectDomain     = config['PROJECT']['osProjectDomain']
-        osProjectName       = config['PROJECT']['osProjectName']
+        str_osAuthUrl           = config['AUTHORIZATION']['osAuthUrl']
+        str_username            = config['AUTHORIZATION']['username']
+        str_password            = config['AUTHORIZATION']['password']
+        str_osProjectDomain     = config['PROJECT']['osProjectDomain']
+        str_osProjectName       = config['PROJECT']['osProjectName']
         
-        scopedSession = self._getScopedSession(osAuthUrl, username, password, osProjectDomain, osProjectName)
+        scopedSession        = self._getScopedSession(str_osAuthUrl, str_username, str_password, str_osProjectDomain, str_osProjectName)
         self.swiftConnection = swift_client.Connection(session=scopedSession)
             
 
-    def _deleteEmptyDirectory(self, key):
-        """
-        Deletes the empty directory created by Swift in the parent directory
-        """
-
-        directoryPath = os.path.join(os.path.dirname(__file__), '../%s'%key)
-        try:
-            os.rmdir(directoryPath)
-            self.qprint("Temporary directory %s deleted"%key)
-        except:
-            self.qprint("No temporary directory found")
-
-
-    def _putContainer(self, key):
+    def _putContainer(self, str_key):
         """
         Creates a container with the name as the key
         """
 
         try:
-            self.swiftConnection.put_container(key)
-            self.qprint('Swift object container created successfully for key %s'%key)
+            self.swiftConnection.put_container(str_key)
+            self.qprint('Swift object container created successfully for key %s'%str_key)
         except Exception as exp:
             self.qprint(exp)
 
 
-    def _putObject(self, containerName, key, value):
+    def _putObject(self, str_containerName, str_key, str_value):
         """
         Creates an object with the given key and value and puts the object in the specified container
         """
 
         try:
-            self.swiftConnection.put_object(containerName, key , contents=value, content_type='text/plain')
-            self.qprint('Object added into Swift container: %s' %key)
+            self.swiftConnection.put_object(containerName, str_key , contents=str_value, content_type='text/plain')
+            self.qprint('Object added into Swift container: %s' %str_key)
 
         except Exception as exp:
             self.qprint('Exception = %s' %exp)
 
 
-    def _getObject(self, key, b_delete):
+    def _getObject(self, str_key, b_delete):
         """
         Returns an object associated with the specified key in the specified container
         Deletes the object after returning if specified
         """
 
         try:
-            containerName = key
-            key = os.path.join('output','data')
-            swiftDataObject = self.swiftConnection.get_object(containerName, key)
+            str_containerName = str_key
+            str_key = os.path.join('output','data')
+            swiftDataObject = self.swiftConnection.get_object(str_containerName, str_key)
             if b_delete:
-                self.swiftConnection.delete_object(containerName, key)
-                self.qprint('Deleted object with key %s' %key)
+                self.swiftConnection.delete_object(str_containerName, str_key)
+                self.qprint('Deleted object with key %s' %str_key)
 
         except Exception as exp:
             self.qprint(exp)
@@ -130,15 +115,15 @@ class SwiftStore(StoreHandler):
         return swiftDataObject
 
 
-    def doZipping(self, fileContent, clientFile):
+    def zipUpContent(self, str_fileContent, str_clientFile):
         """
         Zips up the file content byte stream, reads from archive and returs zipped content
         """
 
-        fileName = clientFile.split('/')[-1]
+        str_fileName = str_clientFile.split('/')[-1]
 
         zipfileObj = zipfile.ZipFile('ziparchive.zip', 'w' ,compression= zipfile.ZIP_DEFLATED)
-        zipfileObj.writestr(fileName,fileContent)
+        zipfileObj.writestr(str_fileName,str_fileContent)
 
         try:
             with open('ziparchive.zip','rb') as f:
@@ -155,35 +140,32 @@ class SwiftStore(StoreHandler):
         """
 
         for k,v in kwargs.items():
-            if k == 'file_content':   fileContent = v
-            if k == 'Path': 	      key         = v
+            if k == 'file_content':   str_fileContent = v
+            if k == 'Path': 	      str_key         = v
             if k == 'is_zip':         b_zip       = v
             if k == 'd_ret':          d_ret       = v
-            if k == 'client_path':    clientFile  = v
+            if k == 'client_path':    str_clientFile  = v
 
         try:
             self._initiateSwiftConnection()
-            self._putContainer(key)
+            self._putContainer(str_key)
         except:
             d_ret['msg']    =  'Key already exists, use a different key'
             d_ret['status'] =  False
             return d_ret
 
         if not b_zip:
-            fileContent = self.doZipping(fileContent, clientFile)
+            str_fileContent = self.zipUpContent(str_fileContent, str_clientFile)
 
         try:
-            containerName = key
-            key           = os.path.join('input','data')
-            self._putObject(containerName, key, fileContent)
+            str_containerName = str_key
+            str_key           = os.path.join('input','data')
+            self._putObject(str_containerName, str_key, str_fileContent)
         except Exception as err:
             self.qprint(err)
             d_ret['msg']    = 'File/Directory not stored in Swift'
             d_ret['status'] = False
             return d_ret
-        finally:
-            #Delete temporary empty directory created by Swift
-            self._deleteEmptyDirectory(key)
 
         #Headers 
         d_ret['status'] = True
@@ -198,26 +180,24 @@ class SwiftStore(StoreHandler):
         """
 
         for k,v in kwargs.items():
-            if k== 'path': key= v
+            if k== 'path': str_key= v
             if k== 'is_zip': b_zip= v
             if k== 'encoding': str_encoding= v
             if k== 'cleanup': b_cleanup= v
             if k== 'd_ret': d_ret= v
 
-
         try:
             self._initiateSwiftConnection()
-            dataObject = self._getObject(key, False)
+            dataObject = self._getObject(str_key, False)
         except Exception as err:
             self.qprint(err)
             d_ret['status'] = False
             d_ret['msg']    = 'Retrieving File/Directory from Swift failed'
             return d_ret
 
-        objectInformation= dataObject[0]
-        objectValue= dataObject[1]
-        fileContent= objectValue
-    
+        str_objectInformation= dataObject[0]
+        str_fileContent= dataObject[1]
+        
         #Unzipping
         if not b_zip:
             raise NotImplementedError('Please use the zip option')
@@ -225,7 +205,7 @@ class SwiftStore(StoreHandler):
         #Encoding
         if str_encoding=='base64':
             try:
-                fileContent         = base64.b64encode(fileContent)
+                str_fileContent         = base64.b64encode(str_fileContent)
                 self.qprint('Base64 encoding successful')
 
                 d_fio               = {
@@ -248,22 +228,22 @@ class SwiftStore(StoreHandler):
                 d_ret['msg']        = d_fio['msg']
                 d_ret['timestamp']  = '%s' % datetime.datetime.now()
                 return d_ret              
+        self.qprint("Transmitting " + Colors.YELLOW + " {} ".format(len(str_fileContent)) + Colors.PURPLE +
+                        " target bytes from " + Colors.YELLOW + 
+                        " swift store container {} ".format(str_key) + Colors.PURPLE + '...', comms = 'status')
+        self.writeData(str_fileContent)
         
-        self.writeData(fileContent)        
-
         #Transmit the file
         d_ret['status'] = True
-
-        #Delete temporary empty directory created by Swift
-        self._deleteEmptyDirectory(key)
 
         return d_ret
 
 
-    def writeData(self, fileContent):
+    def writeData(self, str_fileContent):
         """
         Writes the file content into a wfile object for transferring over the network
         """
-
-        return self.wfile.write(fileContent)
-         
+        self.send_response(200)
+        # self.send_header('Content-type', 'text/json')
+        self.end_headers()
+        self.wfile.write(str_fileContent)

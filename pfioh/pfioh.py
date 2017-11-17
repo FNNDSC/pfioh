@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import  sys
-import  stat
 
 from    io              import  BytesIO as IO
 from    http.server     import  BaseHTTPRequestHandler, HTTPServer
@@ -26,7 +25,7 @@ import  os
 import  multiprocessing
 import  inspect
 import  pudb
-
+import  inspect
 
 # pfioh local dependencies
 try:
@@ -43,7 +42,8 @@ Gd_internalvar = {
     'storeBase':            "/tmp",
     'key2address':          {},
     'httpResponse':         False,
-    'createDirsAsNeeded':   False
+    'createDirsAsNeeded':   False,
+    'b_swiftStorage':       False
 }
 
 class StoreHandler(BaseHTTPRequestHandler):
@@ -93,10 +93,14 @@ class StoreHandler(BaseHTTPRequestHandler):
         """
         b_status        = False
         str_remotePath  = ""
-        if 'path' in d_remote.keys():
+
+        if Gd_internalvar['b_swiftStorage']:
+            b_status= True
+            str_remotePath= d_remote['key']
+        elif 'path' in d_remote.keys():
             str_remotePath  = d_remote['path']
             b_status        = True
-        if 'key' in d_remote.keys():
+        elif 'key' in d_remote.keys():
             d_ret =  self.storage_resolveBasedOnKey(key = d_remote['key'])
             if d_ret['status']:
                 b_status        = True
@@ -125,20 +129,22 @@ class StoreHandler(BaseHTTPRequestHandler):
         b_isFile            = os.path.isfile(str_serverPath)
         b_isDir             = os.path.isdir(str_serverPath)
         b_exists            = os.path.exists(str_serverPath)
-        self.qprint('b_isfile:  %r' % b_isFile, comms = 'status')
-        self.qprint('b_isDir:   %r' % b_isDir,  comms = 'status')
-        self.qprint('b_exists:  %r' % b_exists, comms = 'status')
 
         b_createdNewDir     = False
+        b_swiftStore        = False
+        
+        if Gd_internalvar['b_swiftStorage']:
+            b_exists     = True
+            b_swiftStore = True 
 
         if not b_exists and Gd_internalvar['createDirsAsNeeded']:
             os.makedirs(str_serverPath)
             b_createdNewDir = True
 
         d_ret               = {
-            'dir':              str_serverPath,
             'status':           b_exists or b_createdNewDir,
             'isfile':           b_isFile,
+            'isswiftstore':     b_swiftStore,
             'isdir':            b_isDir,
             'createdNewDir':    b_createdNewDir
         }
@@ -178,7 +184,8 @@ class StoreHandler(BaseHTTPRequestHandler):
         # b_zip               = True
 
         str_encoding        = 'base64'
-
+        if 'encoding' in d_compress: str_encoding = d_compress['encoding']
+        
         if 'cleanup' in d_compress: b_cleanup = d_compress['cleanup']
 
         str_archive         = d_compress['archive']
@@ -188,88 +195,17 @@ class StoreHandler(BaseHTTPRequestHandler):
             b_zip           = True
             # str_archive    = 'zip'
 
-        # If specified (or if the target is a directory), create zip archive
-        # of the local path
-        if b_zip:
-            self.qprint("Zipping target '%s'..." % str_serverPath, comms = 'status')
-            str_dirSuffix   = ""
-            if os.path.isdir(str_serverPath):
-                str_dirSuffix   = '/'
-            d_fio   = zip_process(
-                action  = 'zip',
-                path    = str_serverPath,
-                arcroot = str_serverPath + str_dirSuffix
-            )
-            d_ret['zip']        = d_fio
-            d_ret['status']     = d_fio['status']
-            d_ret['msg']        = d_fio['msg']
-            d_ret['timestamp']  = '%s' % datetime.datetime.now()
-            if not d_ret['status']:
-                self.qprint("An error occurred during the zip operation:\n%s" % d_ret['stdout'],
-                            comms = 'error')
-                self.ret_client(d_ret)
-                return d_ret
-
-            str_fileToProcess   = d_fio['fileProcessed']
-            str_zipFile         = str_fileToProcess
-            d_ret['zip']['filesize']   = '%s' % os.stat(str_fileToProcess).st_size
-            self.qprint("Zip file: " + Colors.YELLOW + "%s" % str_zipFile +
-                        Colors.PURPLE + '...' , comms = 'status')
-
-        # Encode possible binary filedata in base64 suitable for text-only
-        # transmission.
-        if 'encoding' in d_compress: str_encoding    = d_compress['encoding']
-        if str_encoding     == 'base64':
-            self.qprint("base64 encoding target '%s'..." % str_fileToProcess,
-                        comms = 'status')
-            d_fio   = base64_process(
-                action      = 'encode',
-                payloadFile = str_fileToProcess,
-                saveToFile  = os.path.basename(str_fileToProcess) + ".b64"
-            )
-            d_ret['encode']     = d_fio
-            d_ret['status']     = d_fio['status']
-            d_ret['msg']        = d_fio['msg']
-            d_ret['timestamp']  = '%s' % datetime.datetime.now()
-            str_fileToProcess   = d_fio['fileProcessed']
-            d_ret['encoding']   = {}
-            d_ret['encoding']['filesize']   = '%s' % os.stat(str_fileToProcess).st_size
-            str_base64File      = os.path.basename(str_fileToProcess)
-
-        with open(str_fileToProcess, 'rb') as fh:
-            filesize    = os.stat(str_fileToProcess).st_size
-            self.qprint("Transmitting " + Colors.YELLOW + "{:,}".format(filesize) + Colors.PURPLE +
-                        " target bytes from " + Colors.YELLOW +
-                        "%s" % (str_fileToProcess) + Colors.PURPLE + '...', comms = 'status')
-            self.send_response(200)
-            # self.send_header('Content-type', 'text/json')
-            self.end_headers()
-            # try:
-            #     self.wfile.write(fh.read().encode())
-            # except:
-            self.qprint('<transmission>', comms = 'tx')
-            d_ret['transmit']               = {}
-            d_ret['transmit']['msg']        = 'transmitting'
-            d_ret['transmit']['timestamp']  = '%s' % datetime.datetime.now()
-            d_ret['transmit']['filesize']   = '%s' % os.stat(str_fileToProcess).st_size
-            d_ret['status']                 = True
-            d_ret['msg']                    = d_ret['transmit']['msg']
-            self.wfile.write(fh.read())
-
-        if b_cleanup:
-            if b_zip:
-                self.qprint("Removing '%s'..." % (str_zipFile), comms = 'status')
-                if os.path.isfile(str_zipFile):     os.remove(str_zipFile)
-            if str_encoding == 'base64':
-                self.qprint("Removing '%s'..." % (str_base64File), comms = 'status')
-                if os.path.isfile(str_base64File):  os.remove(str_base64File)
-
+        d_ret = self.getData(path=str_fileToProcess, is_zip= b_zip, 
+                             encoding= str_encoding, cleanup= b_cleanup, d_ret=d_ret)
+        
         d_ret['postop']      = self.do_GET_postop(  meta          = d_meta)
-
         self.ret_client(d_ret)
         self.qprint(self.pp.pformat(d_ret).strip(), comms = 'tx')
 
         return d_ret
+
+    def getData(self, **kwargs):
+        raise NotImplementedError('Abstract Method: Please implement this method in child class')
 
     def do_GET_withCopy(self, d_msg):
         """
@@ -343,7 +279,6 @@ class StoreHandler(BaseHTTPRequestHandler):
                                 'meta':     d_meta
                             }
         d_transport         = d_meta['transport']
-
         self.qprint(self.path, comms = 'rx')
 
         # pudb.set_trace()
@@ -356,9 +291,13 @@ class StoreHandler(BaseHTTPRequestHandler):
             d_ret = self.do_GET_withCompression(d_msg)
             return d_ret
 
-        if 'copy'           in d_transport:
-            d_ret = self.do_GET_withCopy(d_msg)
-            return d_ret
+        if 'copy'           in d_transport :
+            if b_swiftStorage:
+                d_ret = self.do_GET_withCompression(d_msg)
+                return d_ret               
+            else:
+                d_ret = self.do_GET_withCopy(d_msg)
+                return d_ret
 
     def form_get(self, str_verb, data):
         """
@@ -391,9 +330,7 @@ class StoreHandler(BaseHTTPRequestHandler):
             if k == 'key':  str_key = v
 
         if len(str_key):
-            str_internalLocation    = '%s/key-%s' % \
-                                      (Gd_internalvar['storeBase'],
-                                       str_key)
+            str_internalLocation    = os.path.join('%s/key-%s' %(Gd_internalvar['storeBase'], str_key),'')              
             Gd_internalvar['key2address'][str_key]  = str_internalLocation
             b_status                = True
 
@@ -638,12 +575,41 @@ class StoreHandler(BaseHTTPRequestHandler):
         }
 
         return d_ret
+    
+    def getHeaders(self):
+        """
+        Return headers of the request
+        """
+        
+        self.qprint('headers= %s' %self.headers)
+        return self.headers['content-length']     
+
+    def rfileRead(self, length):
+        """
+        Return the contents of the file transmitted
+        """
+
+        return self.rfile.read(int(length))
+
+    def unpackForm(self, form, d_form):
+        """
+        Load the json request
+        """
+
+        self.qprint("Unpacking multi-part form message...", comms = 'status')
+        for key in form:
+            self.qprint("\tUnpacking field '%s..." % key, comms = 'status')
+            d_form[key]     = form.getvalue(key)
+        d_msg = json.loads((d_form['d_msg']))
+
+        return d_msg
 
     def do_POST(self, **kwargs):
-
+        
         b_skipInit  = False
         d_msg       = {}
         for k,v in kwargs.items():
+            self.qprint('in for ' +  str(k))
             if k == 'd_msg':
                 d_msg       = v
                 b_skipInit  = True
@@ -652,25 +618,21 @@ class StoreHandler(BaseHTTPRequestHandler):
             # Parse the form data posted
             self.qprint(str(self.headers), comms = 'rx')
 
-            length              = self.headers['content-length']
-            data                = self.rfile.read(int(length))
+            length              = self.getHeaders()
+            data                = self.rfileRead(length)
             form                = self.form_get('POST', data)
             d_form              = {}
             d_ret               = {
-                'msg':      'In do_POST',
-                'status':   True,
-                'formsize': sys.getsizeof(form)
+                'msg'      : 'In do_POST',
+                'status'   : True,
+                'formsize' : sys.getsizeof(form)
             }
 
-            self.qprint('data length = %d' % len(data),   comms = 'status')
+            self.qprint('data length = %d' % len(data), comms = 'status')
             self.qprint('form length = %d' % len(form), comms = 'status')
 
             if len(form):
-                self.qprint("Unpacking multi-part form message...", comms = 'status')
-                for key in form:
-                    self.qprint("\tUnpacking field '%s..." % key, comms = 'status')
-                    d_form[key]     = form.getvalue(key)
-                d_msg               = json.loads((d_form['d_msg']))
+                d_msg = self.unpackForm(form, d_form)
             else:
                 self.qprint("Parsing JSON data...", comms = 'status')
                 d_data              = json.loads(data.decode())
@@ -708,14 +670,23 @@ class StoreHandler(BaseHTTPRequestHandler):
         if 'transport' in d_meta:
             d_transport     = d_meta['transport']
             if 'compress' in d_transport:
-                d_ret = self.do_POST_withCompression(
+                d_ret       = self.do_POST_withCompression(
+                    data    = data,
+                    length  = length,
+                    form    = form,
+                    d_form  = d_form 
+                )
+            if 'copy' in d_transport :
+                if b_swiftStorage:
+                    d_ret   = self.do_POST_withCompression(
                     data    = data,
                     length  = length,
                     form    = form,
                     d_form  = d_form
                 )
-            if 'copy' in d_transport:
-                d_ret   = self.do_POST_withCopy(d_meta)
+                else:
+                    d_ret   = self.do_POST_withCopy(d_meta)
+
 
         if not b_skipInit: self.ret_client(d_ret)
         return d_ret
@@ -771,6 +742,7 @@ class StoreHandler(BaseHTTPRequestHandler):
                 shutil.copy2(str_clientPath, str_serverPath)
             d_ret['copytree']       = b_copyTree
             d_ret['copyfile']       = b_copyFile
+
         if d_copy['symlink']:
             str_clientNode  = str_clientPath.split('/')[-1]
             try:
@@ -943,8 +915,6 @@ class StoreHandler(BaseHTTPRequestHandler):
                     shutil.move(str_path, str_tmp)
                     self.qprint("Recreating clean path %s..." % str_path)
                     os.makedirs(str_path)
-                    st = os.stat(str_path)
-                    os.chmod(str_path, stat.S_IRWXO | stat.S_IRWXG | stat.S_IRWXU)
                     self.qprint("Moving %s to %s" % (str_tmp, str_incomingPath))
                     shutil.move(str_tmp, str_incomingPath)
 
@@ -954,8 +924,6 @@ class StoreHandler(BaseHTTPRequestHandler):
                     d_ret['incomingPath']   = str_incomingPath
                     d_ret['outgoingPath']   = str_outgoingPath
                     os.makedirs(str_outgoingPath)
-                    st = os.stat(str_outgoingPath)
-                    os.chmod(str_outgoingPath, stat.S_IRWXO | stat.S_IRWXG | stat.S_IRWXU)
                     b_status                = True
 
         d_ret['status']     = b_status
@@ -986,6 +954,7 @@ class StoreHandler(BaseHTTPRequestHandler):
         #
         # d_meta              = json.loads(d_form['d_meta'])
         fileContent         = d_form['local']
+        
         str_fileName        = d_meta['local']['path']
         str_encoding        = d_form['encoding']
 
@@ -995,8 +964,7 @@ class StoreHandler(BaseHTTPRequestHandler):
         # str_unpackBase      = self.server.str_fileBase
 
         str_unpackPath      = self.remoteLocation_resolve(d_remote)['path']
-        str_unpackBase  =    str_unpackPath + '/'
-
+        str_unpackBase      = os.path.join(str_unpackPath,'')
         d_transport         = d_meta['transport']
         d_compress          = d_transport['compress']
         if 'unpack' in d_compress:
@@ -1008,51 +976,43 @@ class StoreHandler(BaseHTTPRequestHandler):
             str_fileSuffix = ".zip"
 
         str_localFile   = "%s%s%s" % (str_unpackBase, str_fileOnly, str_fileSuffix)
-
+        
+        #Decoding 
         if str_encoding == "base64":
             d_ret['decode'] = {}
-            data            = base64.b64decode(fileContent)
+            d_ret['write']  = {}
             try:
-                with open(str_localFile, 'wb') as fh:
-                    fh.write(data)
+                data                        = base64.b64decode(fileContent)
                 d_ret['decode']['status']   = True
                 d_ret['decode']['msg']      = 'base64 decode successful!'
-            except:
+            except Exception as err:
                 d_ret['decode']['status']   = False
                 d_ret['decode']['msg']      = 'base64 decode unsuccessful!'
                 self.ret_client(d_ret)
                 self.qprint(d_ret, comms = 'tx')
+                self.qprint(err)
                 return d_ret
-            d_ret['decode']['timestamp']  = '%s' % datetime.datetime.now()
+            d_ret['decode']['timestamp'] = '%s' % datetime.datetime.now()
+
         else:
             d_ret['write']   = {}
-            with open(str_localFile, 'wb') as fh:
-                try:
-                    fh.write(fileContent.decode())
-                    d_ret['write']['decode'] = True
-                except:
-                    fh.write(fileContent)
-                    d_ret['write']['decode'] = False
-            d_ret['write']['file']      = str_localFile
-            d_ret['write']['status']    = True
-            d_ret['write']['msg']       = 'File written successfully!'
-            d_ret['write']['filesize']  = "{:,}".format(os.stat(str_localFile).st_size)
-            d_ret['write']['timestamp'] = '%s' % datetime.datetime.now()
-            d_ret['status']             = True
-            d_ret['msg']                = d_ret['write']['msg']
-        fh.close()
-        if b_unpack and d_compress['archive'] == 'zip':
-            # pudb.set_trace()
-            d_fio   =   zip_process(action          = 'unzip',
-                                    path            = str_unpackPath,
-                                    payloadFile     = str_localFile)
-            d_ret['unzip']  = d_fio
-            d_ret['status'] = d_fio['status']
-            d_ret['msg']    = d_fio['msg']
-            os.remove(str_localFile)
 
+            try:
+                data = fileContent.decode()
+                d_ret['write']['decode'] = True
+            except Exception as err:
+                d_ret['write']['decode'] = False
+                data = fileContent
+
+        b_zip = b_unpack and (d_compress['archive'] == 'zip')
+
+        d_ret= self.storeData(file_name= str_localFile, client_path = str_fileName,
+                              file_content= data, Path= str_unpackPath, is_zip=b_zip,d_ret=d_ret)
+        
+        # pudb.set_trace()
         d_ret['postop'] = self.do_POST_postop(meta          = d_meta,
                                               path          = str_unpackPath)
+
 
         self.send_response(200)
         self.end_headers()
@@ -1063,6 +1023,9 @@ class StoreHandler(BaseHTTPRequestHandler):
         self.qprint(self.pp.pformat(d_ret).strip(), comms = 'tx')
 
         return d_ret
+
+    def storeData(self, **kwargs):
+        raise NotImplementedError('Abstract Method: Please implement this method in child class')
 
     def ret_client(self, d_ret):
         """
@@ -1108,6 +1071,7 @@ class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
         self.str_fileBase                       = "received-"
         self.str_storeBase                      = ""
         self.b_createDirsAsNeeded               = False
+        self.b_swiftStorage                     = False
 
         self.str_unpackDir                      = "/tmp/unpack"
         self.b_removeZip                        = False
@@ -1128,6 +1092,7 @@ class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
 
         self.str_unpackDir                      = self.args['storeBase']
         self.b_removeZip                        = False
+        self.b_swiftStorage                     = self.args['b_swiftStorage']
 
         # print(self.args)
 
@@ -1136,6 +1101,7 @@ class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
         Gd_internalvar['version']               = self.str_version
         Gd_internalvar['createDirsAsNeeded']    = self.args['b_createDirsAsNeeded']
         Gd_internalvar['storeBase']             = self.args['storeBase']
+        Gd_internalvar['b_swiftStorage']        = self.args['b_swiftStorage']
         print(self.str_desc)
 
         self.col2_print("Listening on address:",    self.args['ip'])
@@ -1278,4 +1244,3 @@ def base64_process(**kwargs):
             'status':           True
             # 'decodedBytes':     bytes_decoded
         }
-
