@@ -46,7 +46,7 @@
             "containers": [
               {
                 "command": [
-                  "/usr/bin/pfioh",
+                  "/usr/local/bin/pfioh",
                   "--forever",
                   "--httpResponse",
                   "--storeBase=/tmp/share",

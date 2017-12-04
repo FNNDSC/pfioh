@@ -75,24 +75,17 @@ class SwiftStore(StoreHandler):
         Creates a container with the name as the key
         """
 
-        try:
-            self.swiftConnection.put_container(str_key)
-            self.qprint('Swift object container created successfully for key %s'%str_key)
-        except Exception as exp:
-            self.qprint(exp)
-
+        self.swiftConnection.put_container(str_key)
+        self.qprint('Swift object container created successfully for key %s'%str_key)
+        
 
     def _putObject(self, str_containerName, str_key, str_value):
         """
         Creates an object with the given key and value and puts the object in the specified container
         """
 
-        try:
-            self.swiftConnection.put_object(containerName, str_key , contents=str_value, content_type='text/plain')
-            self.qprint('Object added into Swift container: %s' %str_key)
-
-        except Exception as exp:
-            self.qprint('Exception = %s' %exp)
+        self.swiftConnection.put_object(str_containerName, str_key , contents=str_value, content_type='text/plain')
+        self.qprint('Object added into Swift container: %s' %str_containerName)
 
 
     def _getObject(self, str_key, b_delete):
@@ -101,17 +94,12 @@ class SwiftStore(StoreHandler):
         Deletes the object after returning if specified
         """
 
-        try:
-            str_containerName = str_key
-            str_key = os.path.join('output','data')
-            swiftDataObject = self.swiftConnection.get_object(str_containerName, str_key)
-            if b_delete:
-                self.swiftConnection.delete_object(str_containerName, str_key)
-                self.qprint('Deleted object with key %s' %str_key)
-
-        except Exception as exp:
-            self.qprint(exp)
-
+        str_containerName = str_key
+        str_key = os.path.join('output','data')
+        swiftDataObject = self.swiftConnection.get_object(str_containerName, str_key)
+        if b_delete:
+            self.swiftConnection.delete_object(str_containerName, str_key)
+            self.qprint('Deleted object with key %s' %str_key)
         return swiftDataObject
 
 
@@ -125,10 +113,8 @@ class SwiftStore(StoreHandler):
         zipfileObj = zipfile.ZipFile('ziparchive.zip', 'w' ,compression= zipfile.ZIP_DEFLATED)
         zipfileObj.writestr(str_fileName,str_fileContent)
 
-        try:
-            with open('ziparchive.zip','rb') as f:
-                zippedFileContent = f.read()
-        finally:
+        with open('ziparchive.zip','rb') as f:
+            zippedFileContent = f.read()
             os.remove('ziparchive.zip')
 
         return zippedFileContent
