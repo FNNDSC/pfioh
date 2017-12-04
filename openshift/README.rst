@@ -44,9 +44,13 @@ Creating a secret and running pfioh
 
     oc create secret generic swift-credentials --from-file=<path-to-file>/swift-credentials.cfg
 
+Note: This is only required for pfioh which uses OpenStack Swift Object store.
+
 3) Run pfioh.
 
 .. code-block:: bash
 
-    oc new-app openshift/pfioh-openshift-template.json    
+    oc new-app openshift/pfioh-openshift-template.json 
+
+   
 
