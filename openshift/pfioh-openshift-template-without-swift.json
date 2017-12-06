@@ -3,6 +3,7 @@
   "apiVersion": "v1",
   "metadata": {
     "name": "pfioh-openshift",
+    "creationTimestamp": null,
     "annotations": {
       "description": "Creates pfioh on OpenShift",
       "tags": ""
@@ -13,6 +14,8 @@
       "apiVersion": "v1",
       "kind": "DeploymentConfig",
       "metadata": {
+        "creationTimestamp": null,
+        "generation": 1,
         "labels": {
           "app": "pfioh"
         },
@@ -29,14 +32,17 @@
           "resources": {
           },
           "rollingParams": {
+            "intervalSeconds": 1,
             "maxSurge": "25%",
             "maxUnavailable": "25%",
-            "timeoutSeconds": 600
+            "timeoutSeconds": 600,
+            "updatePeriodSeconds": 1
           },
           "type": "Rolling"
         },
         "template": {
           "metadata": {
+            "creationTimestamp": null,
             "labels": {
               "app": "pfioh",
               "deploymentconfig": "pfioh"
@@ -46,10 +52,10 @@
             "containers": [
               {
                 "command": [
-                  "/usr/local/bin/pfioh",
+                  "/usr/bin/pfioh",
                   "--forever",
                   "--httpResponse",
-                  "--swift-storage",
+                  "--storeBase=/tmp/share",
                   "--createDirsAsNeeded"
                 ],
                 "image": "fnndsc/pfioh",
@@ -66,26 +72,26 @@
                 "terminationMessagePath": "/dev/termination-log",
                 "volumeMounts": [
                   {
-                    "mountPath": "/etc/swift",
-                    "name": "swift-credentials",
-                    "readOnly": true
+                    "name": "localvol",
+                    "mountPath": "/shareDir"
                   }
                 ]
               }
             ],
             "dnsPolicy": "ClusterFirst",
             "restartPolicy": "Always",
+            "securityContext": {
+            },
             "terminationGracePeriodSeconds": 30,
             "volumes": [
               {
-                "name": "swift-credentials",
-                "secret": {
-                  "defaultMode": 420,
-                  "secretName": "swift-credentials"
-                }
-              }
-            ]
-          }
+                "name": "localvol",
+                "hostPath": {
+		  "path": "/tmp/share"
+		 }
+               }
+              ]
+           }
         },
         "test": false,
         "triggers": [
@@ -99,6 +105,7 @@
       "apiVersion": "v1",
       "kind": "Service",
       "metadata": {
+        "creationTimestamp": null,
         "labels": {
           "app": "pfioh"
         },
@@ -116,13 +123,19 @@
         "selector": {
           "app": "pfioh",
           "deploymentconfig": "pfioh"
-        }
+        },
+        "sessionAffinity": "None",
+        "type": "ClusterIP"
       }
     },
     {
       "apiVersion": "v1",
       "kind": "Route",
       "metadata": {
+        "annotations": {
+          "openshift.io/host.generated": "true"
+        },
+        "creationTimestamp": null,
         "name": "pfioh"
       },
       "spec": {
@@ -133,9 +146,13 @@
           "kind": "Service",
           "name": "pfioh",
           "weight": 100
-        }
+        },
+        "wildcardPolicy": "None"
       }
     }
+  ],
+  "parameters": [
+
   ],
   "labels": {
     "template": "application-template-pfioh-openshift"
