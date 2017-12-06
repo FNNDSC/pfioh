@@ -52,7 +52,7 @@
                 "/usr/bin/pfioh",
                 "--forever",
                 "--httpResponse",
-                "--storeBase=/tmp/share",
+                "--storeBase=/share",
                 "--createDirsAsNeeded"
               ],
               "image": "fnndsc/pfioh",
