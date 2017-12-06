@@ -8,8 +8,7 @@
       "tags": ""
     }
   },
-  "objects": [
-    {
+  "objects": [{
       "apiVersion": "v1",
       "kind": "DeploymentConfig",
       "metadata": {
@@ -26,8 +25,7 @@
         },
         "strategy": {
           "activeDeadlineSeconds": 21600,
-          "resources": {
-          },
+          "resources": {},
           "rollingParams": {
             "maxSurge": "25%",
             "maxUnavailable": "25%",
@@ -43,56 +41,45 @@
             }
           },
           "spec": {
-            "containers": [
-              {
-                "command": [
-                  "/usr/local/bin/pfioh",
-                  "--forever",
-                  "--httpResponse",
-                  "--swift-storage",
-                  "--createDirsAsNeeded"
-                ],
-                "image": "fnndsc/pfioh",
-                "imagePullPolicy": "Always",
-                "name": "pfioh",
-                "ports": [
-                  {
-                    "containerPort": 5055,
-                    "protocol": "TCP"
-                  }
-                ],
-                "resources": {
-                },
-                "terminationMessagePath": "/dev/termination-log",
-                "volumeMounts": [
-                  {
-                    "mountPath": "/etc/swift",
-                    "name": "swift-credentials",
-                    "readOnly": true
-                  }
-                ]
-              }
-            ],
+            "containers": [{
+              "command": [
+                "/usr/local/bin/pfioh",
+                "--forever",
+                "--httpResponse",
+                "--swift-storage",
+                "--createDirsAsNeeded"
+              ],
+              "image": "fnndsc/pfioh",
+              "imagePullPolicy": "Always",
+              "name": "pfioh",
+              "ports": [{
+                "containerPort": 5055,
+                "protocol": "TCP"
+              }],
+              "resources": {},
+              "terminationMessagePath": "/dev/termination-log",
+              "volumeMounts": [{
+                "mountPath": "/etc/swift",
+                "name": "swift-credentials",
+                "readOnly": true
+              }]
+            }],
             "dnsPolicy": "ClusterFirst",
             "restartPolicy": "Always",
             "terminationGracePeriodSeconds": 30,
-            "volumes": [
-              {
-                "name": "swift-credentials",
-                "secret": {
-                  "defaultMode": 420,
-                  "secretName": "swift-credentials"
-                }
+            "volumes": [{
+              "name": "swift-credentials",
+              "secret": {
+                "defaultMode": 420,
+                "secretName": "swift-credentials"
               }
-            ]
+            }]
           }
         },
         "test": false,
-        "triggers": [
-          {
-            "type": "ConfigChange"
-          }
-        ]
+        "triggers": [{
+          "type": "ConfigChange"
+        }]
       }
     },
     {
@@ -105,14 +92,12 @@
         "name": "pfioh"
       },
       "spec": {
-        "ports": [
-          {
-            "name": "5055-tcp",
-            "port": 5055,
-            "protocol": "TCP",
-            "targetPort": 5055
-          }
-        ],
+        "ports": [{
+          "name": "5055-tcp",
+          "port": 5055,
+          "protocol": "TCP",
+          "targetPort": 5055
+        }],
         "selector": {
           "app": "pfioh",
           "deploymentconfig": "pfioh"

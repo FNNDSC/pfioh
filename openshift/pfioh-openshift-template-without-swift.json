@@ -9,8 +9,7 @@
       "tags": ""
     }
   },
-  "objects": [
-    {
+  "objects": [{
       "apiVersion": "v1",
       "kind": "DeploymentConfig",
       "metadata": {
@@ -29,8 +28,7 @@
         },
         "strategy": {
           "activeDeadlineSeconds": 21600,
-          "resources": {
-          },
+          "resources": {},
           "rollingParams": {
             "intervalSeconds": 1,
             "maxSurge": "25%",
@@ -49,56 +47,44 @@
             }
           },
           "spec": {
-            "containers": [
-              {
-                "command": [
-                  "/usr/bin/pfioh",
-                  "--forever",
-                  "--httpResponse",
-                  "--storeBase=/tmp/share",
-                  "--createDirsAsNeeded"
-                ],
-                "image": "fnndsc/pfioh",
-                "imagePullPolicy": "Always",
-                "name": "pfioh",
-                "ports": [
-                  {
-                    "containerPort": 5055,
-                    "protocol": "TCP"
-                  }
-                ],
-                "resources": {
-                },
-                "terminationMessagePath": "/dev/termination-log",
-                "volumeMounts": [
-                  {
-                    "name": "localvol",
-                    "mountPath": "/shareDir"
-                  }
-                ]
-              }
-            ],
+            "containers": [{
+              "command": [
+                "/usr/bin/pfioh",
+                "--forever",
+                "--httpResponse",
+                "--storeBase=/tmp/share",
+                "--createDirsAsNeeded"
+              ],
+              "image": "fnndsc/pfioh",
+              "imagePullPolicy": "Always",
+              "name": "pfioh",
+              "ports": [{
+                "containerPort": 5055,
+                "protocol": "TCP"
+              }],
+              "resources": {},
+              "terminationMessagePath": "/dev/termination-log",
+              "volumeMounts": [{
+                "name": "shared-volume",
+                "mountPath": "/share"
+              }]
+            }],
             "dnsPolicy": "ClusterFirst",
             "restartPolicy": "Always",
-            "securityContext": {
-            },
+            "securityContext": {},
             "terminationGracePeriodSeconds": 30,
-            "volumes": [
-              {
-                "name": "localvol",
-                "hostPath": {
-		  "path": "/tmp/share"
-		 }
-               }
-              ]
-           }
+            "volumes": [{
+              "name": "shared-volume",
+              "hostPath": {
+                "path": "/tmp/share"
+              }
+            }]
+          }
         },
         "test": false,
-        "triggers": [
-          {
-            "type": "ConfigChange"
-          }
-        ]
+        "triggers": [{
+          "type": "ConfigChange"
+        }]
       }
     },
     {
@@ -112,14 +98,12 @@
         "name": "pfioh"
       },
       "spec": {
-        "ports": [
-          {
-            "name": "5055-tcp",
-            "port": 5055,
-            "protocol": "TCP",
-            "targetPort": 5055
-          }
-        ],
+        "ports": [{
+          "name": "5055-tcp",
+          "port": 5055,
+          "protocol": "TCP",
+          "targetPort": 5055
+        }],
         "selector": {
           "app": "pfioh",
           "deploymentconfig": "pfioh"
