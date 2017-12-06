@@ -29,6 +29,9 @@ MAINTAINER fnndsc "dev@babymri.org"
 ARG UID=1001
 ENV UID=$UID
 
+COPY . /tmp/pfioh
+COPY ./docker-entrypoint.py /dock/docker-entrypoint.py
+
 RUN apt-get update \
   && apt-get install sudo                                             \
   && useradd -u $UID -ms /bin/bash localuser                          \
@@ -36,13 +39,12 @@ RUN apt-get update \
   && echo "localuser:localuser" | chpasswd                            \
   && adduser localuser sudo                                           \
   && apt-get install -y libssl-dev libcurl4-openssl-dev bsdmainutils vim net-tools inetutils-ping \
-  && pip3 install --prefix /usr pfioh==1.5.5                          \
+  && pip3 install --prefix /usr /tmp/pfioh                            \
   && pip3 install pudb                                                \
   && pip3 install keystoneauth1                                       \
-  && pip3 install python-swiftclient
-
-COPY ./docker-entrypoint.py /dock/docker-entrypoint.py
-RUN chmod 777 /dock                                                   \
+  && pip3 install python-swiftclient                                  \
+  && rm -rf /tmp/pfioh                                                \
+  && chmod 777 /dock                                                  \
   && chmod 777 /dock/docker-entrypoint.py                             \
   && echo "localuser ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
