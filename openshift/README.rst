@@ -2,10 +2,23 @@
 Setup:
 ##############
 
-We intend to use Swift Object store as default backend for pfioh in the OpenShift template.
+pfioh could be run with swift and localstorage(using hostPath) as backend. We typically use hostPath for testing locally.
+
+Assuming oc cluster up has been run.
+
+.. code-block:: bash
+
+   ############################
+    # Changes for using hostPath in container. These are not needed, if you want to use swift as backend storage.
+    mkdir /tmp/share           # Create a directory that could be mounted in container. This is mounted as /shareDir in container.
+    chcon -R -t svirt_sandbox_file_t /tmp/share/ # Change selinux label so that containers can read/write from/to directory.
+    sudo oc edit scc restricted     # Update allowHostDirVolumePlugin to true and runAsUser: type: RunAsAny.
+    A restricted SCC should look like this: https://gist.github.com/ravisantoshgudimetla/91748a20766672d2f26b93b3c42517b4
+
+
 
 ##############
-Swift Object Store
+Swift Object Store. (Ignore this section if you are using hostDir)
 ##############
 
 The OpenStack Object Store project, known as Swift, offers cloud storage software so that you can store and retrieve lots of data with a simple API. It's built for scale and optimized for durability, availability, and concurrency across the entire data set. Swift is ideal for storing unstructured data that can grow without bound. 
@@ -33,24 +46,22 @@ The credentials file for Swift should be stored in a **secret**, mounted at /etc
     osProjectName    = 
 
 **************
-Creating a secret and running pfioh
+Creating a secret and running pfioh.
 **************
-1) Create a text file with the name swift-credentials.cfg as shown above.
+1) Create a text file with the name swift-credentials.cfg as shown above. (Ignore this step if you are running locally).
 
 
-2) Now run the following command to create a secret
+2) Now run the following command to create a secret.(Ignore this step if you are running locally).
 
 .. code-block:: bash
 
     oc create secret generic swift-credentials --from-file=<path-to-file>/swift-credentials.cfg
 
-Note: This is only required for pfioh which uses OpenStack Swift Object store.
 
 3) Run pfioh.
 
 .. code-block:: bash
 
-    oc new-app openshift/pfioh-openshift-template.json 
-
-   
+    oc new-app openshift/pfioh-openshift-template.json    #if you are using swift backend
+    oc new-app openshift/pfioh-openshift-template-without-swift.json #if you are using localstorage
 
