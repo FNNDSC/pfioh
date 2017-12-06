@@ -2,7 +2,7 @@
 Setup:
 ##############
 
-pfioh could be run with swift and localstorage(using hostPath) as backend. We typically use hostPath for testing locally.
+pfioh could be run with swift and local storage (using hostPath) as backend. We typically use hostPath for testing locally.
 
 Assuming oc cluster up has been run.
 
@@ -48,10 +48,10 @@ The credentials file for Swift should be stored in a **secret**, mounted at /etc
 **************
 Creating a secret and running pfioh.
 **************
-1) Create a text file with the name swift-credentials.cfg as shown above. (Ignore this step if you are running locally).
+1) Create a text file with the name swift-credentials.cfg as shown above (ignore this step if you are running locally).
 
 
-2) Now run the following command to create a secret.(Ignore this step if you are running locally).
+2) Now run the following command to create a secret (ignore this step if you are running locally).
 
 .. code-block:: bash
 
@@ -62,6 +62,6 @@ Creating a secret and running pfioh.
 
 .. code-block:: bash
 
-    oc new-app openshift/pfioh-openshift-template.json    #if you are using swift backend
-    oc new-app openshift/pfioh-openshift-template-without-swift.json #if you are using localstorage
+    oc new-app openshift/pfioh-openshift-template.json  # if you are using swift backend
+    oc new-app openshift/pfioh-openshift-template-without-swift.json  # if you are using local storage
 
