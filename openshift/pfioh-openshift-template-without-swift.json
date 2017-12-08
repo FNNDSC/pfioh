@@ -80,10 +80,6 @@
             }],
             "dnsPolicy": "ClusterFirst",
             "restartPolicy": "Always",
-            "securityContext": {
-              "runAsUser": 1000050000,
-              "fsGroup": 1000050000
-            },
             "terminationGracePeriodSeconds": 30,
             "volumes": [{
               "name": "shared-volume",
