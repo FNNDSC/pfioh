@@ -11,6 +11,7 @@ Assuming oc cluster up has been run.
     # Changes for using hostPath in container. These are not needed, if you want to use swift as backend storage.
     mkdir /tmp/share           # Create a directory that could be mounted in container. This is mounted as /share in container.
     chcon -R -t svirt_sandbox_file_t /tmp/share/ # Change selinux label so that containers can read/write from/to directory.
+    sudo oc login -u system:admin
     sudo oc edit scc restricted     # Update allowHostDirVolumePlugin to true and runAsUser type to RunAsAny
 
 
