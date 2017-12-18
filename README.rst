@@ -1,6 +1,6 @@
-##############
-pfioh - v1.5.5
-##############
+####################
+pfioh - v1.5.11.dev0
+####################
 
 .. image:: https://badge.fury.io/py/pman.svg
     :target: https://badge.fury.io/py/pman
@@ -17,7 +17,7 @@ pfioh - v1.5.5
 Overview
 ********
 
-This repository provides ``pfioh`` -- a *server* process (think of it as anonymous ``ftp`` that natively understands recursive paths) that allows for file/path push/copy.
+This repository provides ``pfioh`` -- a *server* process (think of it as anonymous ``ftp`` that natively understands recursive paths) that allows for file/path push/copy. This is the bleeding edge dev branch.
 
 - ``pfioh``: a *file* IO manager;
 
