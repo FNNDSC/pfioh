@@ -25,7 +25,7 @@ class MountDir(StoreHandler):
 
     def __init__(self,*args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.qprint('MountDir initialized')
+        self.dp.qprint('MountDir initialized')
         
 
     def storeData(self, **kwargs):
@@ -45,7 +45,7 @@ class MountDir(StoreHandler):
                 try:
                     fh.write(fileContent)
                 except Exception as err:
-                    self.qprint(err)
+                    self.dp.qprint(err)
 
         finally:
             if b_zip:
@@ -88,7 +88,7 @@ class MountDir(StoreHandler):
     
         #Zipping
         if b_zip:
-            self.qprint("Zipping target '%s'..." % str_fileToProcess, comms = 'status')
+            self.dp.qprint("Zipping target '%s'..." % str_fileToProcess, comms = 'status')
             d_fio = zip_process(
                 action  = 'zip',
                 path    = str_fileToProcess,
@@ -100,7 +100,7 @@ class MountDir(StoreHandler):
             d_ret['timestamp']  = '%s' % datetime.datetime.now()
            
             if not d_ret['status']:
-                self.qprint("An error occurred during the zip operation:\n%s" % d_ret['msg'],
+                self.dp.qprint("An error occurred during the zip operation:\n%s" % d_ret['msg'],
                              comms = 'error')
                 self.ret_client(d_ret)
                 return d_ret
@@ -108,12 +108,12 @@ class MountDir(StoreHandler):
             str_fileToProcess        = d_fio['fileProcessed']
             str_zipFile              = str_fileToProcess
             d_ret['zip']['filesize'] = self.getSize(str_fileToProcess)
-            self.qprint("Zip file: " + Colors.YELLOW + "%s" % str_zipFile +
+            self.dp.qprint("Zip file: " + Colors.YELLOW + "%s" % str_zipFile +
                 Colors.PURPLE + '...' , comms = 'status')
 
         #Encoding
         if str_encoding == 'base64':
-            self.qprint("base64 encoding target '%s'..." % str_fileToProcess,
+            self.dp.qprint("base64 encoding target '%s'..." % str_fileToProcess,
                  comms = 'status')
             d_fio = base64_process(
                 action      = 'encode',
@@ -137,10 +137,10 @@ class MountDir(StoreHandler):
             #Cleanup by deleting temporary files
             if b_cleanup:
                 if b_zip:
-                    self.qprint("Removing '%s'..." % (str_zipFile), comms = 'status')
+                    self.dp.qprint("Removing '%s'..." % (str_zipFile), comms = 'status')
                     if os.path.isfile(str_zipFile):     os.remove(str_zipFile)
                 if str_encoding == 'base64':
-                    self.qprint("Removing '%s'..." % (str_base64File), comms = 'status')
+                    self.dp.qprint("Removing '%s'..." % (str_base64File), comms = 'status')
                     if os.path.isfile(str_base64File):  os.remove(str_base64File)
 
         return d_ret
@@ -153,7 +153,7 @@ class MountDir(StoreHandler):
 
         with open(str_fileToProcess, 'rb') as fh:
             filesize    = os.stat(str_fileToProcess).st_size
-            self.qprint("Transmitting " + Colors.YELLOW + "{:,}".format(filesize) + Colors.PURPLE +
+            self.dp.qprint("Transmitting " + Colors.YELLOW + "{:,}".format(filesize) + Colors.PURPLE +
                         " target bytes from " + Colors.YELLOW + 
                         "%s" % (str_fileToProcess) + Colors.PURPLE + '...', comms = 'status')
             self.send_response(200)
@@ -162,7 +162,7 @@ class MountDir(StoreHandler):
             # try:
             #     self.wfile.write(fh.read().encode())
             # except:
-            self.qprint('<transmission>', comms = 'tx')
+            self.dp.qprint('<transmission>', comms = 'tx')
             d_ret['transmit']               = {}
             d_ret['transmit']['msg']        = 'transmitting'
             d_ret['transmit']['timestamp']  = '%s' % datetime.datetime.now()
