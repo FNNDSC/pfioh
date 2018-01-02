@@ -210,8 +210,13 @@ class StoreHandler(BaseHTTPRequestHandler):
             b_zip           = True
             # str_archive    = 'zip'
 
-        d_ret = self.getData(path=str_fileToProcess, is_zip= b_zip, 
-                             encoding= str_encoding, cleanup= b_cleanup, d_ret=d_ret)
+        d_ret = self.getData(  
+                                path        = str_fileToProcess, 
+                                is_zip      = b_zip, 
+                                encoding    = str_encoding, 
+                                cleanup     = b_cleanup, 
+                                d_ret       = d_ret
+                            )
         
         d_ret['postop']      = self.do_GET_postop(  meta          = d_meta)
         self.ret_client(d_ret)
