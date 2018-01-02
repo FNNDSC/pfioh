@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import  sys
+import  stat
 
 from    io              import  BytesIO as IO
 from    http.server     import  BaseHTTPRequestHandler, HTTPServer
@@ -930,7 +931,7 @@ class StoreHandler(BaseHTTPRequestHandler):
                     shutil.move(str_path, str_tmp)
                     self.dp.qprint("Recreating clean path %s..." % str_path)
                     os.makedirs(str_path)
-                    stat = os.stat(str_path)
+                    st = os.stat(str_path)
                     os.chmod(str_path, stat.S_IRWXO | stat.S_IRWXG | stat.S_IRWXU)
                     self.dp.qprint("Moving %s to %s" % (str_tmp, str_incomingPath))
                     shutil.move(str_tmp, str_incomingPath)
@@ -941,6 +942,8 @@ class StoreHandler(BaseHTTPRequestHandler):
                     d_ret['incomingPath']   = str_incomingPath
                     d_ret['outgoingPath']   = str_outgoingPath
                     os.makedirs(str_outgoingPath)
+                    st = os.stat(str_outgoingPath)
+                    os.chmod(str_outgoingPath, stat.S_IRWXO | stat.S_IRWXG | stat.S_IRWXU)
                     b_status                = True
 
         d_ret['status']     = b_status
