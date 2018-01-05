@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import  sys
+import  stat
 
 from    io              import  BytesIO as IO
 from    http.server     import  BaseHTTPRequestHandler, HTTPServer
@@ -26,6 +27,7 @@ import  multiprocessing
 import  inspect
 import  pudb
 import  inspect
+import  pfmisc
 
 # pfioh local dependencies
 try:
@@ -57,6 +59,15 @@ class StoreHandler(BaseHTTPRequestHandler):
         self.__name__           = 'StoreHandler'
         self.d_ctlVar           = Gd_internalvar
         b_test                  = False
+
+        self.b_useDebug         = False
+        self.str_debugFile      = '/tmp/pfioh-log.txt'
+        self.b_quiet            = True
+        self.dp                 = pfmisc.debug(    
+                                            verbosity   = 0,
+                                            level       = -1,
+                                            within      = self.__name__
+                                            )
         self.pp                 = pprint.PrettyPrinter(indent=4)
 
         for k,v in kwargs.items():
@@ -124,11 +135,15 @@ class StoreHandler(BaseHTTPRequestHandler):
         # pudb.set_trace()
 
         str_serverPath      = self.remoteLocation_resolve(d_remote)['path']
-        self.qprint('server path resolves to %s' % str_serverPath, comms = 'status')
+        self.dp.qprint('server path resolves to %s' % str_serverPath, comms = 'status')
 
         b_isFile            = os.path.isfile(str_serverPath)
         b_isDir             = os.path.isdir(str_serverPath)
         b_exists            = os.path.exists(str_serverPath)
+        
+        self.dp.qprint('b_isfile:  %r' % b_isFile, comms = 'status')
+        self.dp.qprint('b_isDir:   %r' % b_isDir,  comms = 'status')
+        self.dp.qprint('b_exists:  %r' % b_exists, comms = 'status')
 
         b_createdNewDir     = False
         b_swiftStore        = False
@@ -153,7 +168,7 @@ class StoreHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
         self.ret_client(d_ret)
-        self.qprint(d_ret, comms = 'tx')
+        self.dp.qprint(d_ret, comms = 'tx')
 
         return {'status': b_exists or b_createdNewDir}
 
@@ -195,12 +210,17 @@ class StoreHandler(BaseHTTPRequestHandler):
             b_zip           = True
             # str_archive    = 'zip'
 
-        d_ret = self.getData(path=str_fileToProcess, is_zip= b_zip, 
-                             encoding= str_encoding, cleanup= b_cleanup, d_ret=d_ret)
+        d_ret = self.getData(  
+                                path        = str_fileToProcess, 
+                                is_zip      = b_zip, 
+                                encoding    = str_encoding, 
+                                cleanup     = b_cleanup, 
+                                d_ret       = d_ret
+                            )
         
         d_ret['postop']      = self.do_GET_postop(  meta          = d_meta)
         self.ret_client(d_ret)
-        self.qprint(self.pp.pformat(d_ret).strip(), comms = 'tx')
+        self.dp.qprint(self.pp.pformat(d_ret).strip(), comms = 'tx')
 
         return d_ret
 
@@ -279,11 +299,12 @@ class StoreHandler(BaseHTTPRequestHandler):
                                 'meta':     d_meta
                             }
         d_transport         = d_meta['transport']
-        self.qprint(self.path, comms = 'rx')
+
+        self.dp.qprint(self.path, comms = 'rx')
 
         # pudb.set_trace()
         if 'checkRemote'    in d_transport and d_transport['checkRemote']:
-            self.qprint('Getting status on server filesystem...', comms = 'status')
+            self.dp.qprint('Getting status on server filesystem...', comms = 'status')
             d_ret = self.do_GET_remoteStatus(d_msg)
             return d_ret
 
@@ -292,7 +313,7 @@ class StoreHandler(BaseHTTPRequestHandler):
             return d_ret
 
         if 'copy'           in d_transport :
-            if b_swiftStorage:
+            if Gd_internalvar['b_swiftStorage']:
                 d_ret = self.do_GET_withCompression(d_msg)
                 return d_ret               
             else:
@@ -445,7 +466,7 @@ class StoreHandler(BaseHTTPRequestHandler):
         """
 
         global Gd_internalvar
-        self.qprint("hello_process()", comms = 'status')
+        self.dp.qprint("hello_process()", comms = 'status')
         b_status            = False
         d_ret               = {}
         d_request           = {}
@@ -505,16 +526,16 @@ class StoreHandler(BaseHTTPRequestHandler):
         str_path    = self.remoteLocation_resolve(d_meta)['path']
         if len(str_path):
             # str_path    = d_meta['path']
-            self.qprint('Will rmtree <%s>; UID %s, eUID %s...' % (str_path, os.getuid(), os.getegid()))
+            self.dp.qprint('Will rmtree <%s>; UID %s, eUID %s...' % (str_path, os.getuid(), os.getegid()))
             try:
                 shutil.rmtree(str_path)
                 b_status    = True
                 str_msg     = 'Successfully removed tree %s' % str_path
-                self.qprint(str_msg, comms = 'status')
+                self.dp.qprint(str_msg, comms = 'status')
             except:
                 b_status    = False
                 str_msg     = 'Could not remove tree %s. Possible permission error or invalid path. Try using action `ls`' % str_path
-                self.qprint(str_msg, comms = 'error')
+                self.dp.qprint(str_msg, comms = 'error')
         d_ret   = {
             'status':   b_status,
             'msg':      str_msg
@@ -543,7 +564,7 @@ class StoreHandler(BaseHTTPRequestHandler):
         if 'subdir' in d_meta.keys():
             str_path    = os.path.join(str_path, d_meta['subdir'])
         if len(str_path):
-            self.qprint('scandir on  %s...' % str_path)
+            self.dp.qprint('scandir on  %s...' % str_path)
             try:
                 for e in os.scandir(str_path):
                     str_type = ''
@@ -563,11 +584,11 @@ class StoreHandler(BaseHTTPRequestHandler):
                     d_ls[e.name]   = d_e
                 b_status    = True
                 str_msg     = 'Successful scandir on %s' % str_path
-                self.qprint(str_msg, comms = 'status')
+                self.dp.qprint(str_msg, comms = 'status')
             except:
                 b_status    = False
                 str_msg     = 'Could not scandir >%s<. Possible permission error.' % str_path
-                self.qprint(str_msg, comms = 'error')
+                self.dp.qprint(str_msg, comms = 'error')
         d_ret   = {
             'status':   b_status,
             'msg':      str_msg,
@@ -596,9 +617,9 @@ class StoreHandler(BaseHTTPRequestHandler):
         Load the json request
         """
 
-        self.qprint("Unpacking multi-part form message...", comms = 'status')
+        self.dp.qprint("Unpacking multi-part form message...", comms = 'status')
         for key in form:
-            self.qprint("\tUnpacking field '%s..." % key, comms = 'status')
+            self.dp.qprint("\tUnpacking field '%s..." % key, comms = 'status')
             d_form[key]     = form.getvalue(key)
         d_msg = json.loads((d_form['d_msg']))
 
@@ -616,7 +637,7 @@ class StoreHandler(BaseHTTPRequestHandler):
 
         if not b_skipInit:
             # Parse the form data posted
-            self.qprint(str(self.headers), comms = 'rx')
+            self.dp.qprint(str(self.headers), comms = 'rx')
 
             length              = self.getHeaders()
             data                = self.rfileRead(length)
@@ -628,27 +649,27 @@ class StoreHandler(BaseHTTPRequestHandler):
                 'formsize' : sys.getsizeof(form)
             }
 
-            self.qprint('data length = %d' % len(data), comms = 'status')
-            self.qprint('form length = %d' % len(form), comms = 'status')
+            self.dp.qprint('data length = %d' % len(data), comms = 'status')
+            self.dp.qprint('form length = %d' % len(form), comms = 'status')
 
             if len(form):
                 d_msg = self.unpackForm(form, d_form)
             else:
-                self.qprint("Parsing JSON data...", comms = 'status')
+                self.dp.qprint("Parsing JSON data...", comms = 'status')
                 d_data              = json.loads(data.decode())
                 try:
                     d_msg           = d_data['payload']
                 except:
                     d_msg           = d_data
 
-        self.qprint('d_msg = %s' % self.pp.pformat(d_msg).strip(), comms = 'status')
+        self.dp.qprint('d_msg = %s' % self.pp.pformat(d_msg).strip(), comms = 'status')
         d_meta              = d_msg['meta']
 
         if 'action' in d_msg:
-            self.qprint("verb: %s detected." % d_msg['action'], comms = 'status')
+            self.dp.qprint("verb: %s detected." % d_msg['action'], comms = 'status')
             if 'Path' not in d_msg['action']:
                 str_method      = '%s_process' % d_msg['action']
-                self.qprint("method to call: %s(request = d_msg) " % str_method, comms = 'status')
+                self.dp.qprint("method to call: %s(request = d_msg) " % str_method, comms = 'status')
                 d_done          = {'status': False}
                 try:
                     method      = getattr(self, str_method)
@@ -660,8 +681,8 @@ class StoreHandler(BaseHTTPRequestHandler):
                         'status':   False,
                         'msg':      str_msg
                     }
-                    self.qprint(str_msg, comms = 'error')
-                self.qprint(self.pp.pformat(d_done).strip(), comms = 'tx')
+                    self.dp.qprint(str_msg, comms = 'error')
+                self.dp.qprint(self.pp.pformat(d_done).strip(), comms = 'tx')
                 d_ret = d_done
 
         if 'ctl' in d_meta:
@@ -677,7 +698,7 @@ class StoreHandler(BaseHTTPRequestHandler):
                     d_form  = d_form 
                 )
             if 'copy' in d_transport :
-                if b_swiftStorage:
+                if Gd_internalvar['b_swiftStorage']:
                     d_ret   = self.do_POST_withCompression(
                     data    = data,
                     length  = length,
@@ -695,16 +716,16 @@ class StoreHandler(BaseHTTPRequestHandler):
         """
         """
         d_ctl               = d_meta['ctl']
-        self.qprint('Processing server ctl...', comms = 'status')
-        self.qprint(d_meta, comms = 'rx')
+        self.dp.qprint('Processing server ctl...', comms = 'status')
+        self.dp.qprint(d_meta, comms = 'rx')
         if 'serverCmd' in d_ctl:
             if d_ctl['serverCmd'] == 'quit':
-                self.qprint('Shutting down server', comms = 'status')
+                self.dp.qprint('Shutting down server', comms = 'status')
                 d_ret = {
                     'msg':      'Server shut down',
                     'status':   True
                 }
-                self.qprint(d_ret, comms = 'tx')
+                self.dp.qprint(d_ret, comms = 'tx')
                 self.ret_client(d_ret)
                 os._exit(0)
 
@@ -819,7 +840,7 @@ class StoreHandler(BaseHTTPRequestHandler):
                                 'meta'  :  d_remote
                                 }
                 d_ls                    = self.ls_process(    request = dmsg_lstree)
-                self.qprint("target ls = \n%s" % self.pp.pformat(d_ls).strip())
+                self.dp.qprint("target ls = \n%s" % self.pp.pformat(d_ls).strip())
 
     def do_GET_postop(self, **kwargs):
         """
@@ -857,8 +878,8 @@ class StoreHandler(BaseHTTPRequestHandler):
                                     'action': 'rmtree',
                                     'meta'  :  d_remote
                                     }
-                    self.qprint("Performing GET postop cleanup", comms = 'status')
-                    self.qprint("dmsg_rmtree: %s" % dmsg_rmtree, comms = 'status')
+                    self.dp.qprint("Performing GET postop cleanup", comms = 'status')
+                    self.dp.qprint("dmsg_rmtree: %s" % dmsg_rmtree, comms = 'status')
                     d_ret['rmtree']         = self.rmtree_process(request = dmsg_rmtree)
                     d_ret['op']             = 'plugin'
                     b_status                = d_ret['rmtree']['status']
@@ -911,11 +932,13 @@ class StoreHandler(BaseHTTPRequestHandler):
                     str_tmp             = os.path.join('/tmp', str_uuid)
                     str_incomingPath    = os.path.join(str_path, 'incoming')
                     str_outgoingPath    = os.path.join(str_path, 'outgoing')
-                    self.qprint("Moving %s to %s..." % (str_path, str_tmp))
+                    self.dp.qprint("Moving %s to %s..." % (str_path, str_tmp))
                     shutil.move(str_path, str_tmp)
-                    self.qprint("Recreating clean path %s..." % str_path)
+                    self.dp.qprint("Recreating clean path %s..." % str_path)
                     os.makedirs(str_path)
-                    self.qprint("Moving %s to %s" % (str_tmp, str_incomingPath))
+                    st = os.stat(str_path)
+                    os.chmod(str_path, stat.S_IRWXO | stat.S_IRWXG | stat.S_IRWXU)
+                    self.dp.qprint("Moving %s to %s" % (str_tmp, str_incomingPath))
                     shutil.move(str_tmp, str_incomingPath)
 
                     d_ret['op']             = 'plugin'
@@ -924,6 +947,8 @@ class StoreHandler(BaseHTTPRequestHandler):
                     d_ret['incomingPath']   = str_incomingPath
                     d_ret['outgoingPath']   = str_outgoingPath
                     os.makedirs(str_outgoingPath)
+                    st = os.stat(str_outgoingPath)
+                    os.chmod(str_outgoingPath, stat.S_IRWXO | stat.S_IRWXG | stat.S_IRWXU)
                     b_status                = True
 
         d_ret['status']     = b_status
@@ -934,8 +959,8 @@ class StoreHandler(BaseHTTPRequestHandler):
 
         # Parse the form data posted
 
-        self.qprint(str(self.headers),              comms = 'rx')
-        self.qprint('do_POST_withCompression()',    comms = 'status')
+        self.dp.qprint(str(self.headers),              comms = 'rx')
+        self.dp.qprint('do_POST_withCompression()',    comms = 'status')
 
         # data    = None
         # length  = 0
@@ -989,8 +1014,7 @@ class StoreHandler(BaseHTTPRequestHandler):
                 d_ret['decode']['status']   = False
                 d_ret['decode']['msg']      = 'base64 decode unsuccessful!'
                 self.ret_client(d_ret)
-                self.qprint(d_ret, comms = 'tx')
-                self.qprint(err)
+                self.dp.qprint(d_ret, comms = 'tx')
                 return d_ret
             d_ret['decode']['timestamp'] = '%s' % datetime.datetime.now()
 
@@ -1020,7 +1044,7 @@ class StoreHandler(BaseHTTPRequestHandler):
         d_ret['User-agent'] = self.headers['user-agent']
 
         # self.ret_client(d_ret)
-        self.qprint(self.pp.pformat(d_ret).strip(), comms = 'tx')
+        self.dp.qprint(self.pp.pformat(d_ret).strip(), comms = 'tx')
 
         return d_ret
 
