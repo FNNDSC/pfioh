@@ -501,6 +501,11 @@ class StoreHandler(BaseHTTPRequestHandler):
                 d_ret['echoBack']               = {}
                 d_ret['echoBack']['msg']        = d_meta['echoBack']
                 b_status                        = True
+        
+        self.send_response(200)
+        self.end_headers()
+
+        d_ret['User-agent'] = self.headers['user-agent']
 
         return { 'stdout': { 
                             'd_ret':   d_ret,
