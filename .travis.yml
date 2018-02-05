@@ -1,9 +1,26 @@
 language: python
-python:
-  - "3.5"
+services:
+  - docker
+matrix:
+  include:
+    # case 1: run pfioh unit tests
+    - python: "3.5"
+      env: TO_TEST=pfioh
+    # case 2: build pfioh and test integration with CUBE
+    - dist: xenial
+      env: TO_TEST=cube
+      
 # command to install dependencies
-install: "pip install ."
+install: 
+  - if [ "$TO_TEST" = "pfioh" ]; then pip install .; fi
+
+before_script:
+  - if [ "$TO_TEST" = "cube" ]; then mv pfioh/CUBE_CI.sh CUBE_CI.sh; ./CUBE_CI.sh; fi
+
 # command to run tests
-script: nosetests
+script: 
+  - if [ "$TO_TEST" = "pfioh" ];then nosetests; fi
+  - if [ "$TO_TEST" = "cube" ]; then cd ../ChRIS_ultron_backEnd/; docker-compose exec chris_dev python manage.py test --tag integration; fi
+
 notifications:
   slack: fnndsc:DSaLuTVWolC4hevlX56PyU8P
