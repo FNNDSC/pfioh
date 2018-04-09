@@ -132,6 +132,20 @@ parser.add_argument(
     default = '/tmp',
     help    = 'Base path for internal storage.'
 )
+parser.add_argument(
+    '--enableTokenAuth',
+    action  = 'store_true',
+    help    = 'Enables token based authorization and can be configured to look for a .ini file or an openshift secret',
+    dest    = 'b_tokenAuth',
+    default = False
+)
+parser.add_argument(
+    '--tokenPath',
+    action = 'store',
+    help   = 'Specify the absolute path to the token in the file system.\nBy default, this looks for the pfiohConfig.ini file in the current working directory',
+    dest   = 'str_tokenPath',
+    default= ''
+)
 
 # TODO: change to string arguments for each type of object store
 parser.add_argument(
@@ -141,7 +155,6 @@ parser.add_argument(
     default = False,
     help    = 'If specified, use Swift as object Storage'
 )
-
 parser.add_argument(
     '--test',
     help    = 'if specified, perform internal tests',
@@ -163,6 +176,7 @@ parser.add_argument(
     action  = 'store_true',
     default = False
 )
+
 
 args            = parser.parse_args()
 args.port       = int(args.port)
