@@ -68,7 +68,7 @@
                   "cpu": "2000m"
                 },
                 "requests": {
-                  "memory": "128Mi",
+                  "memory": "150Mi",
                   "cpu": "250m"
                 }
               },
