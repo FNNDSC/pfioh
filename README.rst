@@ -87,7 +87,7 @@ This docker has an entry point ``python3``. To enter the dock at a different ent
 
 .. code-block:: bash
 
-   docker run -ti --entrypoint /bin/bash fnndsc/ubuntu-python3
+   docker run --rm -ti --entrypoint /bin/bash fnndsc/ubuntu-python3
    
 Now, install ``pfioh`` and friends using ``pip``
 
