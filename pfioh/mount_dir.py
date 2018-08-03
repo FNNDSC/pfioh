@@ -96,7 +96,7 @@ class MountDir(StoreHandler):
             d_fio   = zip_process(
                 action  = 'zip',
                 path    = str_fileToProcess,
-                arcroot = str_fileToProcess + str_dirSuffix
+                arcroot = os.path.abspath(str_fileToProcess) + str_dirSuffix
             )
             d_ret['zip']        = d_fio
             d_ret['status']     = d_fio['status']
