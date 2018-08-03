@@ -31,7 +31,6 @@ ENV UID=$UID
 
 COPY . /tmp/pfioh
 COPY ./docker-entrypoint.py /dock/docker-entrypoint.py
-COPY pfioh/pfioh_config.cfg /etc/pfioh/auth/
 
 RUN apt-get update \
   && apt-get install sudo                                             \

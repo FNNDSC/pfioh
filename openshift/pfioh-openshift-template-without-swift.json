@@ -80,7 +80,7 @@
                 "mountPath": "/share"
               },
               {
-                "name": "auth-config",
+                "name": "pfioh-config",
                 "mountPath": "/etc/pfioh/auth",
                 "read-only": "true"
               }
@@ -96,9 +96,9 @@
               }
             },
             {
-              "name": "auth-config",
+              "name": "pfioh-config",
               "secret":{
-                "secretName": "config.cfg"
+                "secretName": "pfioh-config"
               }
             }]
           }

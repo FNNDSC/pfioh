@@ -47,7 +47,9 @@
                 "--forever",
                 "--httpResponse",
                 "--swift-storage",
-                "--createDirsAsNeeded"
+                "--createDirsAsNeeded",
+                "--enableTokenAuth",
+                "--tokenPath=/etc/pfioh/auth/pfioh_config.cfg"
               ],
               "image": "fnndsc/pfioh",
               "imagePullPolicy": "Always",
@@ -67,21 +69,35 @@
                 }
               },
               "terminationMessagePath": "/dev/termination-log",
-              "volumeMounts": [{
-                "mountPath": "/etc/swift",
-                "name": "swift-credentials",
-                "readOnly": true
-              }]
+              "volumeMounts": [
+                {
+                  "mountPath": "/etc/swift",
+                  "name": "swift-credentials",
+                  "readOnly": true
+                },
+                {
+                  "name": "pfioh-config",
+                  "mountPath": "/etc/pfioh/auth",
+                  "readOnly": true
+                }
+              ]
             }],
             "dnsPolicy": "ClusterFirst",
             "restartPolicy": "Always",
             "terminationGracePeriodSeconds": 30,
-            "volumes": [{
-              "name": "swift-credentials",
-              "secret": {
-                "defaultMode": 420,
-                "secretName": "swift-credentials"
-              }
+            "volumes": [
+              {
+                "name": "swift-credentials",
+                "secret": {
+                  "defaultMode": 420,
+                  "secretName": "swift-credentials"
+                }
+              },
+              {
+                "name": "pfioh-config",
+                "secret": {
+                  "secretName": "pfioh-config"
+                }
             }]
           }
         },

@@ -28,7 +28,7 @@ import  inspect
 import  pudb
 import  inspect
 import  pfmisc
-from Auth import Auth
+from pfmisc.Auth import Auth
 
 # pfioh local dependencies
 from    pfmisc._colors  import Colors
@@ -135,8 +135,6 @@ class StoreHandler(BaseHTTPRequestHandler):
 
         d_meta              = d_msg['meta']
         d_remote            = d_meta['remote']
-
-        # 
 
         str_serverPath      = self.remoteLocation_resolve(d_remote)['path']
         self.dp.qprint('server path resolves to %s' % str_serverPath, comms = 'status')
@@ -293,15 +291,7 @@ class StoreHandler(BaseHTTPRequestHandler):
         if isAuthorized:
             return self.execute_GET()
         else:
-            d_ret = {
-                "message": "Unauthorized Client Request",
-                "error": error,
-                'status': False
-                }
-
-            self.ret_client(d_ret)
-            self.dp.qprint(d_ret, comms = 'tx')
-            return {"status": False}
+            self.denyAuth()
 
 
     def authorizeRequest(self):
@@ -319,6 +309,20 @@ class StoreHandler(BaseHTTPRequestHandler):
         # If not configured to authorize requests, allow all requests through
         else:
             return (True, "")
+
+    def denyAuth(self):
+        d_ret = {
+                "message": "Unauthorized Client Request",
+                "error": error,
+                'status': False
+                }
+
+        self.send_error(401)
+        self.end_headers()
+
+        self.ret_client(d_ret)
+        self.dp.qprint(d_ret, comms = 'tx')
+        return d_ret
 
     def execute_GET(self):
         d_server            = dict(urllib.parse.parse_qsl(urllib.parse.urlsplit(self.path).query))
@@ -664,17 +668,7 @@ class StoreHandler(BaseHTTPRequestHandler):
         if isAuthorized:
             return self.execute_POST(**kwargs)
         else:
-            d_ret = {
-                "message": "Unauthorized Client Request",
-                "Error": error,
-                'status': False
-                }
-
-            self.ret_client(d_ret)
-            self.dp.qprint(d_ret, comms = 'tx')
-
-            return {"status": False}
-
+            self.denyAuth()
 
     def execute_POST(self, **kwargs):
         b_skipInit  = False
@@ -863,7 +857,6 @@ class StoreHandler(BaseHTTPRequestHandler):
                 b_status    = True
                 d_ret['cmd']    = str_cmd
             if 'op' in d_preop.keys():
-                # 
                 if d_preop['op']   == 'plugin':
                     str_outgoingPath        = '%s/outgoing' % str_path
                     d_ret['op']             = 'plugin'
@@ -1026,7 +1019,6 @@ class StoreHandler(BaseHTTPRequestHandler):
 
         d_msg               = json.loads((d_form['d_msg']))
         d_meta              = d_msg['meta']
-        #
         # d_meta              = json.loads(d_form['d_meta'])
         fileContent         = d_form['local']
         
@@ -1066,7 +1058,6 @@ class StoreHandler(BaseHTTPRequestHandler):
         d_ret= self.storeData(file_name= str_localFile, client_path = str_fileName,
                               file_content= data, Path= str_unpackPath, is_zip=b_zip,d_ret=d_ret)
         
-        # 
         d_ret['postop'] = self.do_POST_postop(meta          = d_meta,
                                               path          = str_unpackPath)
 
@@ -1122,7 +1113,6 @@ class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
 
         :return:
         """
-        
 
         HTTPServer.__init__(self, *args, **kwargs)
         self.LC                                 = 40
@@ -1189,7 +1179,6 @@ class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
                 flush   = True,
                 syslog  = False
         )
-
 
 
 def zipdir(path, ziph, **kwargs):
