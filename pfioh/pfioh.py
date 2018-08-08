@@ -1007,7 +1007,7 @@ class StoreHandler(BaseHTTPRequestHandler):
 
         str_localFile   = "%s%s%s" % (str_unpackBase, str_fileOnly, str_fileSuffix)
         
-        #Decoding 
+        # Decoding 
         if str_encoding == "base64":
             d_ret['decode'] = {}
             d_ret['write']  = {}
