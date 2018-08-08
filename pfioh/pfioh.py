@@ -174,7 +174,7 @@ class StoreHandler(BaseHTTPRequestHandler):
 
     def do_GET_withCompression(self, d_msg):
         """
-        Process a "GET" using zip/base64 encoding
+        Process a "GET" using zip
 
         :return:
         """
@@ -197,9 +197,6 @@ class StoreHandler(BaseHTTPRequestHandler):
 
         b_cleanup           = False
         # b_zip               = True
-
-        str_encoding        = 'base64'
-        if 'encoding' in d_compress: str_encoding = d_compress['encoding']
         
         if 'cleanup' in d_compress: b_cleanup = d_compress['cleanup']
 
@@ -212,8 +209,7 @@ class StoreHandler(BaseHTTPRequestHandler):
 
         d_ret = self.getData(  
                                 path        = str_fileToProcess, 
-                                is_zip      = b_zip, 
-                                encoding    = str_encoding, 
+                                is_zip      = b_zip,
                                 cleanup     = b_cleanup, 
                                 d_ret       = d_ret
                             )
@@ -986,7 +982,6 @@ class StoreHandler(BaseHTTPRequestHandler):
         fileContent         = d_form['local']
         
         str_fileName        = d_meta['local']['path']
-        str_encoding        = d_form['encoding']
 
         d_remote            = d_meta['remote']
         b_unpack            = False
@@ -1007,31 +1002,15 @@ class StoreHandler(BaseHTTPRequestHandler):
 
         str_localFile   = "%s%s%s" % (str_unpackBase, str_fileOnly, str_fileSuffix)
         
-        # Decoding 
-        if str_encoding == "base64":
-            d_ret['decode'] = {}
-            d_ret['write']  = {}
-            try:
-                data                        = base64.b64decode(fileContent)
-                d_ret['decode']['status']   = True
-                d_ret['decode']['msg']      = 'base64 decode successful!'
-            except Exception as err:
-                d_ret['decode']['status']   = False
-                d_ret['decode']['msg']      = 'base64 decode unsuccessful!'
-                self.ret_client(d_ret)
-                self.dp.qprint(d_ret, comms = 'tx')
-                return d_ret
-            d_ret['decode']['timestamp'] = '%s' % datetime.datetime.now()
+        #Decoding 
+        d_ret['write']   = {}
 
-        else:
-            d_ret['write']   = {}
-
-            try:
-                data = fileContent.decode()
-                d_ret['write']['decode'] = True
-            except Exception as err:
-                d_ret['write']['decode'] = False
-                data = fileContent
+        try:
+            data = fileContent.decode()
+            d_ret['write']['decode'] = True
+        except Exception as err:
+            d_ret['write']['decode'] = False
+            data = fileContent
 
         b_zip = b_unpack and (d_compress['archive'] == 'zip')
 
