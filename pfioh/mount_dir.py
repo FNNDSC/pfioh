@@ -91,7 +91,8 @@ class MountDir(StoreHandler):
             self.dp.qprint("Zipping target '%s'..." % str_fileToProcess, comms = 'status')
  
             str_dirSuffix   = ""
-            if os.path.isdir(str_fileToProcess):
+            # Ensure that directory paths end in '/'
+            if os.path.isdir(str_fileToProcess) and str_fileToProcess[-1] != '/':
                 str_dirSuffix   = '/'
             d_fio   = zip_process(
                 action  = 'zip',
