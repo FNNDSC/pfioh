@@ -168,7 +168,6 @@ class SwiftStore(StoreHandler):
         for k,v in kwargs.items():
             if k== 'path': str_key= v
             if k== 'is_zip': b_zip= v
-            if k== 'encoding': str_encoding= v
             if k== 'cleanup': b_cleanup= v
             if k== 'd_ret': d_ret= v
 
@@ -187,33 +186,7 @@ class SwiftStore(StoreHandler):
         #Unzipping
         if not b_zip:
             raise NotImplementedError('Please use the zip option')
-
-        #Encoding
-        if str_encoding=='base64':
-            try:
-                str_fileContent         = base64.b64encode(str_fileContent)
-                self.qprint('Base64 encoding successful')
-
-                d_fio               = {
-                    'msg':            'Encode successful',
-                    'status':         True
-                }
-                d_ret['encode']     = d_fio
-                d_ret['status']     = d_fio['status']
-                d_ret['msg']        = d_fio['msg']
-                d_ret['timestamp']  = '%s' % datetime.datetime.now()
-
-            except Exception as err:
-                self.qprint(err)
-                d_fio               = {
-                    'msg':            'Encode unsuccessful',
-                    'status':         False
-                }
-                d_ret['encode']     = d_fio
-                d_ret['status']     = d_fio['status']
-                d_ret['msg']        = d_fio['msg']
-                d_ret['timestamp']  = '%s' % datetime.datetime.now()
-                return d_ret              
+             
         self.qprint("Transmitting " + Colors.YELLOW + " {} ".format(len(str_fileContent)) + Colors.PURPLE +
                         " target bytes from " + Colors.YELLOW + 
                         " swift store container {} ".format(str_key) + Colors.PURPLE + '...', comms = 'status')
