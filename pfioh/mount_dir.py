@@ -82,7 +82,6 @@ class MountDir(StoreHandler):
         for k,v in kwargs.items():
             if k== 'path': str_fileToProcess= v 
             if k== 'is_zip': b_zip= v
-            if k== 'encoding': str_encoding= v
             if k== 'cleanup': b_cleanup= v
             if k== 'd_ret': d_ret= v
     
@@ -116,24 +115,6 @@ class MountDir(StoreHandler):
             self.dp.qprint("Zip file: " + Colors.YELLOW + "%s" % str_zipFile +
                 Colors.PURPLE + '...' , comms = 'status')
 
-        #Encoding
-        if str_encoding == 'base64':
-            self.dp.qprint("base64 encoding target '%s'..." % str_fileToProcess,
-                 comms = 'status')
-            d_fio = base64_process(
-                action      = 'encode',
-                payloadFile = str_fileToProcess,
-                saveToFile  = str_fileToProcess + ".b64"
-            )
-            d_ret['encode']     = d_fio
-            d_ret['status']     = d_fio['status']
-            d_ret['msg']        = d_fio['msg']
-            d_ret['timestamp']  = '%s' % datetime.datetime.now()
-            str_fileToProcess   = d_fio['fileProcessed']
-            d_ret['encoding']   = {}
-            d_ret['encoding']['filesize'] = self.getSize(str_fileToProcess)
-            str_base64File      = str_fileToProcess
-
         try:
             #Reading from file
             d_ret = self.readData(str_fileToProcess, d_ret)
@@ -144,9 +125,6 @@ class MountDir(StoreHandler):
                 if b_zip:
                     self.dp.qprint("Removing '%s'..." % (str_zipFile), comms = 'status')
                     if os.path.isfile(str_zipFile):     os.remove(str_zipFile)
-                if str_encoding == 'base64':
-                    self.dp.qprint("Removing '%s'..." % (str_base64File), comms = 'status')
-                    if os.path.isfile(str_base64File):  os.remove(str_base64File)
 
         return d_ret
 
