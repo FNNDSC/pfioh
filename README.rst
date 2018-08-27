@@ -3,13 +3,13 @@ pfioh - v1.5.16.0
 ####################
 
 .. image:: https://badge.fury.io/py/pman.svg
-    :target: https://badge.fury.io/py/pman
+    :target: https://badge.fury.io/py/pfioh
 
-.. image:: https://travis-ci.org/FNNDSC/pman.svg?branch=master
-    :target: https://travis-ci.org/FNNDSC/pman
+.. image:: https://travis-ci.org/FNNDSC/pfioh.svg?branch=master
+    :target: https://travis-ci.org/FNNDSC/pfioh
 
 .. image:: https://img.shields.io/badge/python-3.5%2B-blue.svg
-    :target: https://badge.fury.io/py/pman
+    :target: https://badge.fury.io/py/pfioh
 
 .. contents:: Table of Contents
 
