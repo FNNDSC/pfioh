@@ -30,17 +30,14 @@ import  inspect
 import  pfmisc
 
 # pfioh local dependencies
-try:
-    from    ._colors        import Colors
-    from    .debug          import debug
-except:
-    from    _colors         import Colors
-    from    debug           import debug
+from    pfmisc._colors  import Colors
+from    pfmisc.debug    import debug
 
 # Global var
 Gd_internalvar = {
     'name':                 "pfioh",
     'version':              "",
+    'verbosity':            0,
     'storeBase':            "/tmp",
     'key2address':          {},
     'httpResponse':         False,
@@ -64,8 +61,7 @@ class StoreHandler(BaseHTTPRequestHandler):
         self.str_debugFile      = '/tmp/pfioh-log.txt'
         self.b_quiet            = True
         self.dp                 = pfmisc.debug(    
-                                            verbosity   = 0,
-                                            level       = -1,
+                                            verbosity   = Gd_internalvar['verbosity'],
                                             within      = self.__name__
                                             )
         self.pp                 = pprint.PrettyPrinter(indent=4)
@@ -75,25 +71,6 @@ class StoreHandler(BaseHTTPRequestHandler):
 
         if not b_test:
             BaseHTTPRequestHandler.__init__(self, *args, **kwargs)
-
-    def qprint(self, msg, **kwargs):
-
-        str_comms  = ""
-        for k,v in kwargs.items():
-            if k == 'comms':    str_comms  = v
-
-        str_caller  = inspect.stack()[1][3]
-
-        if not StoreHandler.b_quiet:
-            if str_comms == 'status':   print(Colors.PURPLE,    end="")
-            if str_comms == 'error':    print(Colors.RED,       end="")
-            if str_comms == "tx":       print(Colors.YELLOW + "<----")
-            if str_comms == "rx":       print(Colors.GREEN  + "---->")
-            print('%s' % datetime.datetime.now() + " | "  + os.path.basename(__file__) + ':' + self.__name__ + "." + str_caller + '() | ', end="")
-            print(msg)
-            if str_comms == "tx":       print(Colors.YELLOW + "<----")
-            if str_comms == "rx":       print(Colors.GREEN  + "---->")
-            print(Colors.NO_COLOUR, end="", flush=True)
 
     def remoteLocation_resolve(self, d_remote):
         """
@@ -603,7 +580,7 @@ class StoreHandler(BaseHTTPRequestHandler):
         Return headers of the request
         """
         
-        self.qprint('headers= %s' %self.headers)
+        self.dp.qprint('headers= %s' %self.headers)
         return self.headers['content-length']     
 
     def rfileRead(self, length):
@@ -631,7 +608,7 @@ class StoreHandler(BaseHTTPRequestHandler):
         b_skipInit  = False
         d_msg       = {}
         for k,v in kwargs.items():
-            self.qprint('in for ' +  str(k))
+            self.dp.qprint('in for ' +  str(k))
             if k == 'd_msg':
                 d_msg       = v
                 b_skipInit  = True
@@ -1054,11 +1031,16 @@ class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
     Handle requests in a separate thread.
     """
 
-    def col2_print(self, str_left, str_right):
-        print(Colors.WHITE +
-              ('%*s' % (self.LC, str_left)), end='')
-        print(Colors.LIGHT_BLUE +
-              ('%*s' % (self.RC, str_right)) + Colors.NO_COLOUR)
+    def col2_print(self, str_left, str_right, level = 1):
+        self.dp.qprint(Colors.WHITE +
+              ('%*s' % (self.LC, str_left)), 
+              end       = '', 
+              level     = level,
+              syslog    = False)
+        self.dp.qprint(Colors.LIGHT_BLUE +
+              ('%*s' % (self.RC, str_right)) + Colors.NO_COLOUR, 
+              level     = level,
+              syslog    = False)
 
     def __init__(self, *args, **kwargs):
         """
@@ -1084,8 +1066,6 @@ class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
         self.str_unpackDir                      = "/tmp/unpack"
         self.b_removeZip                        = False
 
-        self.dp                                 = debug(verbosity=0, level=-1)
-
     def setup(self, **kwargs):
         global Gd_internalvar
 
@@ -1110,14 +1090,26 @@ class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
         Gd_internalvar['createDirsAsNeeded']    = self.args['b_createDirsAsNeeded']
         Gd_internalvar['storeBase']             = self.args['storeBase']
         Gd_internalvar['b_swiftStorage']        = self.args['b_swiftStorage']
-        print(self.str_desc)
+        Gd_internalvar['verbosity']             = int(self.args['verbosity'])
+
+        self.verbosity                          = Gd_internalvar['verbosity']
+
+        self.dp                                 = debug(verbosity = self.verbosity)
+
+        self.dp.qprint(self.str_desc)
 
         self.col2_print("Listening on address:",    self.args['ip'])
         self.col2_print("Listening on port:",       self.args['port'])
         self.col2_print("Server listen forever:",   self.args['b_forever'])
         self.col2_print("Return HTTP responses:",   self.args['b_httpResponse'])
 
-        print(Colors.LIGHT_GREEN + "\n\n\tWaiting for incoming data..." + Colors.NO_COLOUR, flush=True)
+        self.dp.qprint(
+                Colors.BLINK_GREEN + 
+                "\n\n\t\t\t\tWaiting for incoming data...\n\n" + 
+                Colors.NO_COLOUR, 
+                flush   = True,
+                syslog  = False
+        )
 
 
 def zipdir(path, ziph, **kwargs):
