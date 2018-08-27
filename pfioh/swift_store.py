@@ -12,10 +12,7 @@ from   pfioh                       import base64_process, zip_process, zipdir
 from   keystoneauth1.identity      import v3
 from   keystoneauth1               import session
 from   swiftclient                 import client as swift_client
-try:
-    from ._colors import Colors
-except:
-    from _colors import Colors
+from   pfmisc._colors              import Colors
 
 class SwiftStore(StoreHandler):
 

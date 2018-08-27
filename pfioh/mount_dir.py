@@ -14,10 +14,7 @@ from   io                   import BytesIO
 from   io                   import StringIO
 from   pfioh                import StoreHandler
 from   pfioh                import base64_process, zip_process, zipdir
-try:
-    from ._colors import Colors
-except:
-    from _colors import Colors
+from   pfmisc._colors       import Colors
 
 import pudb
 
