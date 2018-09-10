@@ -1,6 +1,6 @@
 from unittest import TestCase
 
-from pfioh import C_stree
+from pfmisc.C_snode import C_stree
 
 import pudb
 
@@ -128,8 +128,8 @@ class TestCSnode(TestCase):
         print('cTree = %s' % cTree)
         cTree.rm('/4/9/B/E/K/file2')
         print('cTree = %s' % cTree)
-        cTree.rm('/4/9/B/E/K')
-        print('cTree = %s' % cTree)
+        # cTree.rm('/4/9/B/E/K')
+        # print('cTree = %s' % cTree)
 
         dTree   = C_stree()
         cTree.tree_copy(startPath   = '/a/b/file5',
