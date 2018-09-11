@@ -1,15 +1,15 @@
 ####################
-pfioh - v1.5.14.2
+pfioh - v1.6.0.0
 ####################
 
-.. image:: https://badge.fury.io/py/pman.svg
-    :target: https://badge.fury.io/py/pman
+.. image:: https://badge.fury.io/py/pfioh.svg
+    :target: https://badge.fury.io/py/pfioh
 
-.. image:: https://travis-ci.org/FNNDSC/pman.svg?branch=master
-    :target: https://travis-ci.org/FNNDSC/pman
+.. image:: https://travis-ci.org/FNNDSC/pfioh.svg?branch=master
+    :target: https://travis-ci.org/FNNDSC/pfioh
 
 .. image:: https://img.shields.io/badge/python-3.5%2B-blue.svg
-    :target: https://badge.fury.io/py/pman
+    :target: https://badge.fury.io/py/pfioh
 
 .. contents:: Table of Contents
 
@@ -74,38 +74,6 @@ To deactivate virtual env:
 
     deactivate
 
-Using the ``fnndsc/ubuntu-python3`` dock
-========================================
-
-We provide a slim docker image with python3 based off Ubuntu. If you want to play inside this dock and install ``pman`` manually, do
-
-.. code-block:: bash
-
-    docker pull fnndsc/ubuntu-python3
-
-This docker has an entry point ``python3``. To enter the dock at a different entry and install your own stuff:
-
-.. code-block:: bash
-
-   docker run --rm -ti --entrypoint /bin/bash fnndsc/ubuntu-python3
-   
-Now, install ``pfioh`` and friends using ``pip``
-
-.. code-block:: bash
-
-   apt update && \
-   apt install -y libssl-dev libcurl4-openssl-dev librtmp-dev && \
-   pip install pfioh
-   
-**If you do the above, remember to** ``commit`` **your changes to the docker image otherwise they'll be lost when you remove the dock instance!**
-
-.. code-block:: bash
-
-  docker commit <container-ID> local/pfioh
-  
- where ``<container-ID>`` is the ID of the above container.
-  
-
 Using the ``fnndsc/pfioh`` dock
 ===============================
 
@@ -130,6 +98,65 @@ Usage
 
 For ``pfioh`` detailed information, see the `pfioh wiki page <https://github.com/FNNDSC/pfioh/wiki/pfioh-overview>`_.
 
+.. code-block:: html
+
+        [--ip <IP>]                            
+
+        The IP interface on which to listen. Default %s.
+
+        [--port <port>]
+        The port on which to listen. Defaults to '5055'.
+
+        [--man <manpage>]
+        Internal man page with more detail on specific calls.
+
+        [--forever]
+        Start service and do not terminate.
+
+        [--httpResponse]
+        Send return strings as HTTP formatted replies with content-type html.
+
+        [--storeBase <storagePath>]
+        A file system location in the network space accessible to ``pfioh``
+        that is used to unpack received files and also store results of
+        processing.
+
+        [--createDirsAsNeeded]
+        If specified, create dirs in the base storage as needed.
+
+        [--test]
+        Run internal tests.
+
+        [-x|--desc]                                     
+        Provide an overview help page.
+
+        [-y|--synopsis]
+        Provide a synopsis help summary.
+
+        [--version]
+        Print internal version number and exit.
+
+        [-v|--verbosity <level>]
+        Set the verbosity level. "0" typically means no/minimal output. Allows for
+        more fine tuned output control as opposed to '--quiet' that effectively
+        silences everything.
+
+********
+EXAMPLES
+********
+
+Start ``pfioh`` in ``forever`` mode, accessible on localhost:
+
+.. code-block:: bash
+
+            pfioh                                                   \\
+                --forever                                           \\
+                --port 5055                                         \\
+                --storeBase=/tmp                                    \\
+                --httpResponse                                      \\
+                --createDirsAsNeeded                                \\
+                --verbosity 1                                       \\
+                --ip 127.0.0.1
 
 
 

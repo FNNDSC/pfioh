@@ -1,7 +1,7 @@
 from unittest import TestCase
 
-from pfioh import Message
-from pfioh import Colors
+from pfmisc.message import Message
+from pfmisc._colors import Colors
 
 class TestMessage(TestCase):
     def test_message_constructor(self):
