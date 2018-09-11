@@ -2,7 +2,7 @@
 pfioh - v1.5.16.0
 ####################
 
-.. image:: https://badge.fury.io/py/pman.svg
+.. image:: https://badge.fury.io/py/pfioh.svg
     :target: https://badge.fury.io/py/pfioh
 
 .. image:: https://travis-ci.org/FNNDSC/pfioh.svg?branch=master
@@ -145,18 +145,18 @@ For ``pfioh`` detailed information, see the `pfioh wiki page <https://github.com
 EXAMPLES
 ********
 
-Start ``pfioh`` in forever mode:
+Start ``pfioh`` in ``forever`` mode, accessible on localhost:
 
 .. code-block:: bash
 
             pfioh                                                   \\
                 --forever                                           \\
-                --ip %s                                      \\
                 --port 5055                                         \\
                 --storeBase=/tmp                                    \\
                 --httpResponse                                      \\
                 --createDirsAsNeeded                                \\
-                --verbosity 1
+                --verbosity 1                                       \\
+                --ip 127.0.0.1
 
 
 
