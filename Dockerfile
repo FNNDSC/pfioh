@@ -43,7 +43,7 @@ RUN apt-get update \
   && pip3 install --prefix /usr /tmp/pfioh                            \  
   && pip3 install pudb                                                \
   && pip3 install keystoneauth1                                       \
-  && pip3 install pfmisc==1.2.2					      \
+  && pip3 install pfmisc==1.2.2                                       \
   && pip3 install python-swiftclient                                  \
   && rm -rf /tmp/pfioh                                                \
   && chmod 777 /dock                                                  \

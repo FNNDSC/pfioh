@@ -28,6 +28,7 @@ import  inspect
 import  pudb
 import  inspect
 import  pfmisc
+from pfmisc.Auth import Auth
 
 # pfioh local dependencies
 from    pfmisc._colors  import Colors
@@ -42,7 +43,9 @@ Gd_internalvar = {
     'key2address':          {},
     'httpResponse':         False,
     'createDirsAsNeeded':   False,
-    'b_swiftStorage':       False
+    'b_swiftStorage':       False,
+    'b_tokenAuth':          False,
+    'authModule':           None
 }
 
 class StoreHandler(BaseHTTPRequestHandler):
@@ -53,9 +56,11 @@ class StoreHandler(BaseHTTPRequestHandler):
         """
         """
         global  Gd_internalvar
+        self.__auth             = None
         self.__name__           = 'StoreHandler'
         self.d_ctlVar           = Gd_internalvar
         b_test                  = False
+        self.__b_tokenAuth      = Gd_internalvar['b_tokenAuth']
 
         self.b_useDebug         = False
         self.str_debugFile      = '/tmp/pfioh-log.txt'
@@ -66,11 +71,33 @@ class StoreHandler(BaseHTTPRequestHandler):
                                             )
         self.pp                 = pprint.PrettyPrinter(indent=4)
 
+        if self.__b_tokenAuth:
+            self.__auth    = Gd_internalvar['authModule']
+
         for k,v in kwargs.items():
-            if k == 'test': b_test  = True
+            if k == 'test'  : b_test   = True
+            if k == 'tokenAuth': self.__b_tokenAuth = v
 
         if not b_test:
             BaseHTTPRequestHandler.__init__(self, *args, **kwargs)
+
+    def qprint(self, msg, **kwargs):
+        str_comms  = ""
+        for k,v in kwargs.items():
+            if k == 'comms':    str_comms  = v
+
+        str_caller  = inspect.stack()[1][3]
+
+        if not StoreHandler.b_quiet:
+            if str_comms == 'status':   print(Colors.PURPLE,    end="")
+            if str_comms == 'error':    print(Colors.RED,       end="")
+            if str_comms == "tx":       print(Colors.YELLOW + "<----")
+            if str_comms == "rx":       print(Colors.GREEN  + "---->")
+            print('%s' % datetime.datetime.now() + " | "  + os.path.basename(__file__) + ':' + self.__name__ + "." + str_caller + '() | ', end="")
+            print(msg)
+            if str_comms == "tx":       print(Colors.YELLOW + "<----")
+            if str_comms == "rx":       print(Colors.GREEN  + "---->")
+            print(Colors.NO_COLOUR, end="", flush=True)
 
     def remoteLocation_resolve(self, d_remote):
         """
@@ -108,8 +135,6 @@ class StoreHandler(BaseHTTPRequestHandler):
 
         d_meta              = d_msg['meta']
         d_remote            = d_meta['remote']
-
-        # pudb.set_trace()
 
         str_serverPath      = self.remoteLocation_resolve(d_remote)['path']
         self.dp.qprint('server path resolves to %s' % str_serverPath, comms = 'status')
@@ -169,7 +194,6 @@ class StoreHandler(BaseHTTPRequestHandler):
                                                     path          = str_serverPath)
         if d_ret['preop']['status']:
             str_serverPath      = d_ret['preop']['outgoingPath']
-
         str_fileToProcess   = str_serverPath
 
         b_cleanup           = False
@@ -263,7 +287,44 @@ class StoreHandler(BaseHTTPRequestHandler):
         return
 
     def do_GET(self):
+        isAuthorized, error = self.authorizeRequest()
+        if isAuthorized:
+            return self.execute_GET()
+        else:
+            self.denyAuth()
 
+
+    def authorizeRequest(self):
+        # Authenticate user request if the server is started with the __b_tokenAuth private flag set to true
+        if self.__b_tokenAuth:
+            print('Authorizing client request...')
+            isAuthorized, error = self.__auth.authorizeClientRequest(self.headers)
+            if isAuthorized:
+                return (True, "")
+            else:
+                code, msg, explain = error
+                self.send_response(code, msg)
+                return (False, "%s %s %s" % (code, msg, explain))
+
+        # If not configured to authorize requests, allow all requests through
+        else:
+            return (True, "")
+
+    def denyAuth(self):
+        d_ret = {
+                "message": "Unauthorized Client Request",
+                "error": error,
+                'status': False
+                }
+
+        self.send_error(401)
+        self.end_headers()
+
+        self.ret_client(d_ret)
+        self.dp.qprint(d_ret, comms = 'tx')
+        return d_ret
+
+    def execute_GET(self):
         d_server            = dict(urllib.parse.parse_qsl(urllib.parse.urlsplit(self.path).query))
         d_meta              = ast.literal_eval(d_server['meta'])
 
@@ -275,7 +336,6 @@ class StoreHandler(BaseHTTPRequestHandler):
 
         self.dp.qprint(self.path, comms = 'rx')
 
-        # pudb.set_trace()
         if 'checkRemote'    in d_transport and d_transport['checkRemote']:
             self.dp.qprint('Getting status on server filesystem...', comms = 'status')
             d_ret = self.do_GET_remoteStatus(d_msg)
@@ -324,7 +384,7 @@ class StoreHandler(BaseHTTPRequestHandler):
             if k == 'key':  str_key = v
 
         if len(str_key):
-            str_internalLocation    = os.path.join('%s/key-%s' %(Gd_internalvar['storeBase'], str_key),'')              
+            str_internalLocation    = os.path.join('%s/key-%s' %(Gd_internalvar['storeBase'], str_key),'')
             Gd_internalvar['key2address'][str_key]  = str_internalLocation
             b_status                = True
 
@@ -604,7 +664,13 @@ class StoreHandler(BaseHTTPRequestHandler):
         return d_msg
 
     def do_POST(self, **kwargs):
-        
+        isAuthorized, error = self.authorizeRequest()
+        if isAuthorized:
+            return self.execute_POST(**kwargs)
+        else:
+            self.denyAuth()
+
+    def execute_POST(self, **kwargs):
         b_skipInit  = False
         d_msg       = {}
         for k,v in kwargs.items():
@@ -791,7 +857,6 @@ class StoreHandler(BaseHTTPRequestHandler):
                 b_status    = True
                 d_ret['cmd']    = str_cmd
             if 'op' in d_preop.keys():
-                # pudb.set_trace()
                 if d_preop['op']   == 'plugin':
                     str_outgoingPath        = '%s/outgoing' % str_path
                     d_ret['op']             = 'plugin'
@@ -954,7 +1019,6 @@ class StoreHandler(BaseHTTPRequestHandler):
 
         d_msg               = json.loads((d_form['d_msg']))
         d_meta              = d_msg['meta']
-        #
         # d_meta              = json.loads(d_form['d_meta'])
         fileContent         = d_form['local']
         
@@ -994,7 +1058,6 @@ class StoreHandler(BaseHTTPRequestHandler):
         d_ret= self.storeData(file_name= str_localFile, client_path = str_fileName,
                               file_content= data, Path= str_unpackPath, is_zip=b_zip,d_ret=d_ret)
         
-        # pudb.set_trace()
         d_ret['postop'] = self.do_POST_postop(meta          = d_meta,
                                               path          = str_unpackPath)
 
@@ -1068,7 +1131,6 @@ class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
 
     def setup(self, **kwargs):
         global Gd_internalvar
-
         for k,v in kwargs.items():
             if k == 'args': self.args           = v
             if k == 'desc': self.str_desc       = v
@@ -1082,7 +1144,6 @@ class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
         self.b_removeZip                        = False
         self.b_swiftStorage                     = self.args['b_swiftStorage']
 
-        # print(self.args)
 
         Gd_internalvar['httpResponse']          = self.args['b_httpResponse']
         Gd_internalvar['name']                  = self.str_name
@@ -1097,11 +1158,19 @@ class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
         self.dp                                 = debug(verbosity = self.verbosity)
 
         self.dp.qprint(self.str_desc)
+        if self.args['b_tokenAuth']:
+            Gd_internalvar['b_tokenAuth'] = True
+            if self.args['str_tokenPath'] != '':
+                Gd_internalvar['authModule']        = Auth('http', self.args['str_tokenPath'])
+            else:
+                Gd_internalvar['authModule']        = Auth('http', 'pfioh_config.cfg')
+        print(self.str_desc)
 
         self.col2_print("Listening on address:",    self.args['ip'])
         self.col2_print("Listening on port:",       self.args['port'])
         self.col2_print("Server listen forever:",   self.args['b_forever'])
         self.col2_print("Return HTTP responses:",   self.args['b_httpResponse'])
+        self.col2_print("Authorization enabled:",   self.args['b_tokenAuth'])
 
         self.dp.qprint(
                 Colors.BLINK_GREEN + 

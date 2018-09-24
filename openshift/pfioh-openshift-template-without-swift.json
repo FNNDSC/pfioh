@@ -53,7 +53,9 @@
                 "--forever",
                 "--httpResponse",
                 "--storeBase=/share",
-                "--createDirsAsNeeded"
+                "--createDirsAsNeeded",
+                "--enableTokenAuth",
+                "--tokenPath=/etc/pfioh/auth/pfioh_config.cfg"
               ],
               "image": "fnndsc/pfioh",
               "imagePullPolicy": "Always",
@@ -76,7 +78,13 @@
               "volumeMounts": [{
                 "name": "shared-volume",
                 "mountPath": "/share"
-              }]
+              },
+              {
+                "name": "pfioh-config",
+                "mountPath": "/etc/pfioh/auth",
+                "read-only": "true"
+              }
+            ]
             }],
             "dnsPolicy": "ClusterFirst",
             "restartPolicy": "Always",
@@ -85,6 +93,12 @@
               "name": "shared-volume",
               "hostPath": {
                 "path": "/tmp/share"
+              }
+            },
+            {
+              "name": "pfioh-config",
+              "secret":{
+                "secretName": "pfioh-config"
               }
             }]
           }

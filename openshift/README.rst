@@ -13,7 +13,38 @@ Assuming oc cluster up has been run.
     chcon -R -t svirt_sandbox_file_t /tmp/share/ # Change selinux label so that containers can read/write from/to directory.
     sudo oc login -u system:admin
     sudo oc edit scc restricted     # Update allowHostDirVolumePlugin to true and runAsUser type to RunAsAny
+    # To set the passwords, follow the instructions in the "Setting up authorization" section. Simply editing example-config.cfg DOES NOT DO ANYTHING.
+    oc create -f example-secret.yml # Uses the default password ("password")
 
+**************
+Setting up authorization
+**************
+1) Edit the configuration file:
+
+.. code-block:: bash
+    
+    #example-config.cfg
+    [AUTH TOKENS]
+    examplekey1 = examplepassword1
+    examplekey2 = examplepassword2
+
+2) Convert the configuration to base64:
+
+.. code-block:: bash
+  
+    cat example-config.cfg | base64
+
+3) Place the output in a new file:
+
+.. code-block:: bash
+  
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: pfioh-config
+    type: Opaque
+    data:
+      pfioh_config.cfg: <base64 encoded configuration>
 
 ##############
 Swift Object Store. (Ignore this section if you are using hostDir)
