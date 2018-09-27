@@ -102,7 +102,7 @@ class SwiftStore(StoreHandler):
 
     def zipUpContent(self, str_fileContent, str_clientFile):
         """
-        Zips up the file content byte stream, reads from archive and returs zipped content
+        Zips up the file content byte stream, reads from archive and returns zipped content
         """
 
         str_fileName = str_clientFile.split('/')[-1]
