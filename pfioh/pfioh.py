@@ -30,6 +30,14 @@ import  inspect
 import  pfmisc
 from pfmisc.Auth import Auth
 
+sys.path.insert(1, os.path.join(os.path.dirname(__file__), '../pfioh'))
+try:
+    import swift_store
+except:
+    sys.path.insert(1, os.path.join(get_python_lib(True, True), 'site-packages'))
+    sys.path.insert(1, os.path.join(get_python_lib(True, True), 'site-packages/pfioh'))
+    import swift_store
+
 # pfioh local dependencies
 from    pfmisc._colors  import Colors
 from    pfmisc.debug    import debug
@@ -208,21 +216,28 @@ class StoreHandler(BaseHTTPRequestHandler):
             b_zip           = True
             # str_archive    = 'zip'
 
-        d_ret = self.getData(  
-                                path        = str_fileToProcess, 
+        d_ret = swift_store.getData(
+                                Path        = str_fileToProcess, 
                                 is_zip      = b_zip,
                                 cleanup     = b_cleanup, 
                                 d_ret       = d_ret
                             )
-        
+        if d_ret['status']:
+            self.send_response(200)
+            self.end_headers()
+            f = open('/local/incomingData.zip', "rb")
+            buf = 16*1024
+            while 1:
+                chunk = f.read(buf)
+                if not chunk:
+                    break
+                self.wfile.write(chunk)
+            f.close()
         d_ret['postop']      = self.do_GET_postop(  meta          = d_meta)
         self.ret_client(d_ret)
         self.dp.qprint(self.pp.pformat(d_ret).strip(), comms = 'tx')
 
         return d_ret
-
-    def getData(self, **kwargs):
-        raise NotImplementedError('Abstract Method: Please implement this method in child class')
 
     def do_GET_withCopy(self, d_msg):
         """
@@ -353,12 +368,12 @@ class StoreHandler(BaseHTTPRequestHandler):
                 d_ret = self.do_GET_withCopy(d_msg)
                 return d_ret
 
-    def form_get(self, str_verb, data):
+    def form_get(self, str_verb):
         """
         Returns a form from cgi.FieldStorage
         """
         return cgi.FieldStorage(
-            IO(data),
+            fp = self.rfile,
             headers = self.headers,
             environ =
             {
@@ -635,13 +650,13 @@ class StoreHandler(BaseHTTPRequestHandler):
 
         return d_ret
     
-    def getHeaders(self):
+    def getContentLength(self):
         """
         Return headers of the request
         """
         
         self.dp.qprint('headers= %s' %self.headers)
-        return self.headers['content-length']     
+        return int(self.headers['content-length'])
 
     def rfileRead(self, length):
         """
@@ -657,9 +672,12 @@ class StoreHandler(BaseHTTPRequestHandler):
 
         self.dp.qprint("Unpacking multi-part form message...", comms = 'status')
         for key in form:
-            self.dp.qprint("\tUnpacking field '%s..." % key, comms = 'status')
-            d_form[key]     = form.getvalue(key)
-        d_msg = json.loads((d_form['d_msg']))
+            if key == "local":
+                d_form[key] = form[key].file
+            else:
+                self.dp.qprint("\tUnpacking field '%s..." % key, comms = 'status')
+                d_form[key]     = form.getvalue(key)
+        d_msg = json.loads(d_form['d_msg'])
 
         return d_msg
 
@@ -683,24 +701,21 @@ class StoreHandler(BaseHTTPRequestHandler):
             # Parse the form data posted
             self.dp.qprint(str(self.headers), comms = 'rx')
 
-            length              = self.getHeaders()
-            data                = self.rfileRead(length)
-            form                = self.form_get('POST', data)
+            form                = self.form_get('POST')
             d_form              = {}
             d_ret               = {
                 'msg'      : 'In do_POST',
                 'status'   : True,
                 'formsize' : sys.getsizeof(form)
             }
-
-            self.dp.qprint('data length = %d' % len(data), comms = 'status')
             self.dp.qprint('form length = %d' % len(form), comms = 'status')
 
             if len(form):
                 d_msg = self.unpackForm(form, d_form)
             else:
                 self.dp.qprint("Parsing JSON data...", comms = 'status')
-                d_data              = json.loads(data.decode())
+                length              = self.getContentLength()
+                d_data              = json.loads(self.rfile.read(length).decode())
                 try:
                     d_msg           = d_data['payload']
                 except:
@@ -736,19 +751,17 @@ class StoreHandler(BaseHTTPRequestHandler):
             d_transport     = d_meta['transport']
             if 'compress' in d_transport:
                 d_ret       = self.do_POST_withCompression(
-                    data    = data,
-                    length  = length,
+                    length  = self.getContentLength(),
                     form    = form,
                     d_form  = d_form 
                 )
             if 'copy' in d_transport :
                 if Gd_internalvar['b_swiftStorage']:
                     d_ret   = self.do_POST_withCompression(
-                    data    = data,
-                    length  = length,
-                    form    = form,
-                    d_form  = d_form
-                )
+                        length  = length,
+                        form    = form,
+                        d_form  = d_form
+                    )
                 else:
                     d_ret   = self.do_POST_withCopy(d_meta)
 
@@ -1020,7 +1033,7 @@ class StoreHandler(BaseHTTPRequestHandler):
         d_msg               = json.loads((d_form['d_msg']))
         d_meta              = d_msg['meta']
         # d_meta              = json.loads(d_form['d_meta'])
-        fileContent         = d_form['local']
+        inputStream         = d_form['local']
         
         str_fileName        = d_meta['local']['path']
 
@@ -1046,17 +1059,15 @@ class StoreHandler(BaseHTTPRequestHandler):
         #Decoding 
         d_ret['write']   = {}
 
-        try:
-            data = fileContent.decode()
-            d_ret['write']['decode'] = True
-        except Exception as err:
-            d_ret['write']['decode'] = False
-            data = fileContent
-
         b_zip = b_unpack and (d_compress['archive'] == 'zip')
 
-        d_ret= self.storeData(file_name= str_localFile, client_path = str_fileName,
-                              file_content= data, Path= str_unpackPath, is_zip=b_zip,d_ret=d_ret)
+        d_ret = swift_store.storeData(
+            file_name = str_localFile,
+            client_path = str_fileName,
+            input_stream = inputStream,
+            path = str_unpackPath,
+            is_zip = b_zip,
+            d_ret = d_ret)
         
         d_ret['postop'] = self.do_POST_postop(meta          = d_meta,
                                               path          = str_unpackPath)
@@ -1071,9 +1082,6 @@ class StoreHandler(BaseHTTPRequestHandler):
         self.dp.qprint(self.pp.pformat(d_ret).strip(), comms = 'tx')
 
         return d_ret
-
-    def storeData(self, **kwargs):
-        raise NotImplementedError('Abstract Method: Please implement this method in child class')
 
     def ret_client(self, d_ret):
         """
