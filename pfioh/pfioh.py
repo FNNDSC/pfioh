@@ -38,7 +38,7 @@ from    pfmisc.debug    import debug
 Gd_internalvar = {
     'name':                 "pfioh",
     'version':              "",
-    'verbosity':            0,
+    'verbosity':            1,
     'storeBase':            "/tmp",
     'key2address':          {},
     'httpResponse':         False,
