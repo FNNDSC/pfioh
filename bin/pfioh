@@ -328,7 +328,7 @@ if args.b_version:
     sys.exit(1)
 
 if args.b_swiftStorage:
-    server = pfioh.ThreadedHTTPServer((args.ip, args.port), pfioh.StoreHandler)
+    server = pfioh.ThreadedHTTPServer((args.ip, args.port), swift_store.SwiftStore)        
 else:
     server = pfioh.ThreadedHTTPServer((args.ip, args.port), mount_dir.MountDir) 
 
