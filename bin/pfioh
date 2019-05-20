@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #
-# (c) 2017 Fetal-Neonatal Neuroimaging & Developmental Science Center
+# (c) 2017- Fetal-Neonatal Neuroimaging & Developmental Science Center
 #                   Boston Children's Hospital
 #
 #              http://childrenshospital.org/FNNDSC/
@@ -34,7 +34,7 @@ except:
 from    pfmisc._colors             import Colors
 
 str_defIP   = [l for l in ([ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")][:1], [[(s.connect(('8.8.8.8', 53)), s.getsockname()[0], s.close()) for s in [socket.socket(socket.AF_INET, socket.SOCK_DGRAM)]][0][1]]) if l][0][0]
-str_version = "1.6.0.2"
+str_version = "2.0.0.0"
 str_desc    = Colors.CYAN + """
         __ _       _
        / _(_)     | |
@@ -60,17 +60,17 @@ str_desc    = Colors.CYAN + """
     incoming file data from a client, and can also return server-side file trees
     to a client.
 
-    'pfioh' can also zip up/unzip file trees so that entire paths can be easily
+    'pfioh' can also zip/unzip file trees so that entire paths can be easily
     transferred.
     
 """ + \
         Colors.BLINK_RED +  """
         
-              +-------------------------------------------------------+
-              | NOTE THAT THIS SERVER DOES NOT CURRENTLY AUTHENTICATE |
-              | AND WILL HONOR *ALL* FILE/PATH PUSH/PULL REQUESTS!    |
-              +-------------------------------------------------------+
-              
+              +---------------------------------------------------------+
+              | Use '--enableTokenAuth' and '--tokenPath <tokenPath>'   |
+              |         arguments for secure communication.             |    
+              +---------------------------------------------------------+
+
 """ + Colors.NO_COLOUR
 
 str_historyNotes = Colors.YELLOW + """
@@ -80,6 +80,9 @@ str_historyNotes = Colors.YELLOW + """
     
     1 June 2017: v1.2.0
     o Add internal key-coded storage lookup.
+
+    May 2019
+    o Updates for swift usage *and* local FS use.
 
     NOTES:
     ------
@@ -102,7 +105,8 @@ def synopsis(ab_shortOnly = False):
             pfioh                                                   \\
                 [--ip <IPofServer>]                                 \\
                 [--port <port>]                                     \\
-                [--man <manpage>]                                   \\
+                [--desc]                                            \\
+                [--synopsis]                                        \\
                 [--forever]                                         \\
                 [--storeBase <storagePath>]                         \\
                 [--verbosity <level>]                               \\
@@ -110,6 +114,8 @@ def synopsis(ab_shortOnly = False):
                 [--test]                                            \\
                 [--httpResponse]                                    \\
                 [--createDirsAsNeeded]                              \\
+                [--enableTokenAuth]                                 \\
+                [--tokenPath <tokenPath>]                           \\
                 [--version]
 
     BRIEF EXAMPLE
@@ -144,13 +150,10 @@ def synopsis(ab_shortOnly = False):
 
         [--ip <IP>]                            
 
-        The IP interface on which to listen. Default %s.
+        The IP interface on which to listen. Defaults to %s.
 
         [--port <port>]
         The port on which to listen. Defaults to '5055'.
-
-        [--man <manpage>]
-        Internal man page with more detail on specific calls.
 
         [--forever]
         Start service and do not terminate.
@@ -165,6 +168,17 @@ def synopsis(ab_shortOnly = False):
 
         [--createDirsAsNeeded]
         If specified, create dirs in the base storage as needed.
+
+        [--enableTokenAuth]
+        Enables token based authorization and can be configured to look for a .ini 
+        file or an openshift secret.
+
+        [--tokenPath <tokenPath>]
+        Specify the absolute path to the token in the file system.
+        By default, this looks for the pfiohConfig.ini file in the current working directory.
+
+        [--swift-storage]
+        If specified, use Swift as object storage.
 
         [--test]
         Run internal tests.
@@ -210,32 +224,25 @@ parser.add_argument(
     action  = 'store',
     dest    = 'ip',
     default = str_defIP,
-    help    = 'IP to expose.'
+    help    = 'Set the IP to expose.'
 )
 parser.add_argument(
     '--port',
     action  = 'store',
     dest    = 'port',
     default = '5055',
-    help    = 'Port to use.'
+    help    = 'Set the port to use.'
 )
 parser.add_argument(
     '--version',
-    help    = 'if specified, print version number',
+    help    = 'If specified, print version number.',
     dest    = 'b_version',
     action  = 'store_true',
     default = False
 )
 parser.add_argument(
-    '--man',
-    help    = 'request help',
-    dest    = 'man',
-    action  = 'store',
-    default = ''
-)
-parser.add_argument(
     '--forever',
-    help    = 'if specified, serve forever, otherwise terminate after single service.',
+    help    = 'If specified, serve forever, otherwise terminate after single service.',
     dest    = 'b_forever',
     action  = 'store_true',
     default = False
@@ -245,19 +252,21 @@ parser.add_argument(
     action  = 'store',
     dest    = 'storeBase',
     default = '/tmp',
-    help    = 'Base path for internal storage.'
+    help    = 'Set the base path for internal storage.'
 )
 parser.add_argument(
     '--enableTokenAuth',
     action  = 'store_true',
-    help    = 'Enables token based authorization and can be configured to look for a .ini file or an openshift secret',
+    help    = """Enables token based authorization and can be configured to look for a .ini file
+    or an openshift secret.""",
     dest    = 'b_tokenAuth',
     default = False
 )
 parser.add_argument(
     '--tokenPath',
     action = 'store',
-    help   = 'Specify the absolute path to the token in the file system.\nBy default, this looks for the pfiohConfig.ini file in the current working directory',
+    help   = """Specify the absolute path to the token in the file system.
+    By default, this looks for the pfiohConfig.ini file in the current working directory.""",
     dest   = 'str_tokenPath',
     default= ''
 )
@@ -268,44 +277,44 @@ parser.add_argument(
     action  = 'store_true',
     dest    = 'b_swiftStorage',
     default = False,
-    help    = 'If specified, use Swift as object Storage'
+    help    = 'If specified, use Swift as object storage.'
 )
 parser.add_argument(
     '--test',
-    help    = 'if specified, perform internal tests',
+    help    = 'If specified, perform internal tests.',
     dest    = 'b_test',
     action  = 'store_true',
     default = False
 )
 parser.add_argument(
     '--httpResponse',
-    help    = 'if specified, return HTTP responses',
+    help    = 'If specified, return HTTP responses.',
     dest    = 'b_httpResponse',
     action  = 'store_true',
     default = False
 )
 parser.add_argument(
     '--createDirsAsNeeded',
-    help    = 'if specified, allow the service to create base storage directories as needed',
+    help    = 'If specified, allow the service to create base storage directories as needed.',
     dest    = 'b_createDirsAsNeeded',
     action  = 'store_true',
     default = False
 )
 parser.add_argument(
     "-v", "--verbosity",
-    help    = "verbosity level for app",
+    help    = "Set the verbosity level for app.",
     dest    = 'verbosity',
     default = "1")
 parser.add_argument(
     "-x", "--desc",
-    help    = "long synopsis",
+    help    = "Print a long synopsis.",
     dest    = 'desc',
     action  = 'store_true',
     default = False
 )
 parser.add_argument(
     "-y", "--synopsis",
-    help    = "short synopsis",
+    help    = "Print a short synopsis.",
     dest    = 'synopsis',
     action  = 'store_true',
     default = False

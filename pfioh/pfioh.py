@@ -229,7 +229,7 @@ class StoreHandler(BaseHTTPRequestHandler):
                                 d_ret       = d_ret
                             )
         d_ret['postop']      = self.do_GET_postop(  meta          = d_meta)
-        #self.ret_client(d_ret)
+        self.ret_client(d_ret)
         self.dp.qprint(self.pp.pformat(d_ret).strip(), comms = 'tx')
 
         return d_ret
@@ -1047,13 +1047,6 @@ class StoreHandler(BaseHTTPRequestHandler):
         if 'unpack' in d_compress:
             b_unpack        = d_compress['unpack']
 
-        str_fileOnly        = os.path.split(str_fileName)[-1]
-        str_fileSuffix      = ""
-        if d_compress['archive'] == "zip":
-            str_fileSuffix = ".zip"
-
-        str_localFile   = "%s%s%s" % (str_unpackBase, str_fileOnly, str_fileSuffix)
-        
         #Decoding 
         d_ret['write']   = {}
 
