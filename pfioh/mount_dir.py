@@ -42,6 +42,7 @@ class MountDir(StoreHandler):
         if b_zip:
             with zipfile.ZipFile(inputStream, 'r') as zipfileObj:
                 zipfileObj.extractall(path=str_destPath)
+            d_ret['write']['file'] = str_destPath
         else:
             filePath = os.path.join(str_destPath, str_clientPath.split('/')[-1])
             f = open(filePath, 'wb')
@@ -52,6 +53,7 @@ class MountDir(StoreHandler):
                     break
                 f.write(chunk)
             f.close()
+            d_ret['write']['file'] = filePath
         d_ret['write']['status']    = True
         d_ret['write']['msg']       = 'File written successfully!'
         d_ret['write']['timestamp'] = '%s' % datetime.datetime.now()

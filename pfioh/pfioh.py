@@ -229,7 +229,7 @@ class StoreHandler(BaseHTTPRequestHandler):
                                 d_ret       = d_ret
                             )
         d_ret['postop']      = self.do_GET_postop(  meta          = d_meta)
-        #self.ret_client(d_ret)
+        self.ret_client(d_ret)
         self.dp.qprint(self.pp.pformat(d_ret).strip(), comms = 'tx')
 
         return d_ret
@@ -696,19 +696,15 @@ class StoreHandler(BaseHTTPRequestHandler):
                 b_skipInit  = True
 
         if not b_skipInit:
-            # Parse the form data posted
             self.dp.qprint(str(self.headers), comms = 'rx')
-
-            form                = self.form_get('POST')
-            d_form              = {}
-            d_ret               = {
-                'msg'      : 'In do_POST',
-                'status'   : True,
-                'formsize' : sys.getsizeof(form)
-            }
-            self.dp.qprint('form length = %d' % len(form), comms = 'status')
-
-            if len(form):
+            if self.headers['File'] == 'true':
+                form                = self.form_get('POST')
+                d_form              = {}
+                d_ret               = {
+                    'msg'      : 'In do_POST',
+                    'status'   : True,
+                    'formsize' : sys.getsizeof(form)
+                }
                 d_msg = self.unpackForm(form, d_form)
             else:
                 self.dp.qprint("Parsing JSON data...", comms = 'status')
@@ -1047,13 +1043,6 @@ class StoreHandler(BaseHTTPRequestHandler):
         if 'unpack' in d_compress:
             b_unpack        = d_compress['unpack']
 
-        str_fileOnly        = os.path.split(str_fileName)[-1]
-        str_fileSuffix      = ""
-        if d_compress['archive'] == "zip":
-            str_fileSuffix = ".zip"
-
-        str_localFile   = "%s%s%s" % (str_unpackBase, str_fileOnly, str_fileSuffix)
-        
         #Decoding 
         d_ret['write']   = {}
 

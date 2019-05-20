@@ -1,5 +1,5 @@
 ####################
-pfioh - v1.6.0.2
+pfioh - v2.0.0.0
 ####################
 
 .. image:: https://badge.fury.io/py/pfioh.svg
@@ -18,8 +18,6 @@ Overview
 ********
 
 This repository provides ``pfioh`` -- a *server* process (think of it as anonymous ``ftp`` that natively understands recursive paths) that allows for file/path push/copy.
-
-- ``pfioh``: a *file* IO manager;
 
 pfioh
 =====
@@ -87,7 +85,10 @@ and then run
 
 .. code-block:: bash
 
-    docker run --name pfioh -v /home:/Users --rm  fnndsc/pfioh --forever --httpResponse --storeBase=/tmp --createDirsAsNeeded
+    docker run --name pfioh -v /home:/Users --rm  \
+        fnndsc/pfioh                              \
+        --forever --httpResponse                  \
+        --storeBase=/tmp --createDirsAsNeeded
 
 *****
 Usage
@@ -102,13 +103,10 @@ For ``pfioh`` detailed information, see the `pfioh wiki page <https://github.com
 
         [--ip <IP>]                            
 
-        The IP interface on which to listen. Default %s.
+        The IP interface on which to listen. Defaults to current host IP.
 
         [--port <port>]
         The port on which to listen. Defaults to '5055'.
-
-        [--man <manpage>]
-        Internal man page with more detail on specific calls.
 
         [--forever]
         Start service and do not terminate.
@@ -123,6 +121,17 @@ For ``pfioh`` detailed information, see the `pfioh wiki page <https://github.com
 
         [--createDirsAsNeeded]
         If specified, create dirs in the base storage as needed.
+
+        [--enableTokenAuth]
+        Enables token based authorization and can be configured to look for a .ini 
+        file or an openshift secret.
+        
+        [--tokenPath <tokenPath>]
+        Specify the absolute path to the token in the file system.
+        By default, this looks for the pfiohConfig.ini file in the current working directory.
+
+        [--swift-storage]
+        If specified, use Swift as object storage.
 
         [--test]
         Run internal tests.
