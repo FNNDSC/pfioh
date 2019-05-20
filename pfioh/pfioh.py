@@ -225,6 +225,7 @@ class StoreHandler(BaseHTTPRequestHandler):
                                 path        = str_fileToProcess, 
                                 is_zip      = b_zip,
                                 cleanup     = b_cleanup, 
+                                key         = d_remote['key'],
                                 d_ret       = d_ret
                             )
         d_ret['postop']      = self.do_GET_postop(  meta          = d_meta)
@@ -1063,6 +1064,7 @@ class StoreHandler(BaseHTTPRequestHandler):
             input_stream = inputStream,
             path = str_unpackPath,
             is_zip = b_zip,
+            key = d_remote['key'],
             d_ret = d_ret)
         
         d_ret['postop'] = self.do_POST_postop(meta          = d_meta,

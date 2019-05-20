@@ -55,15 +55,16 @@ class SwiftStore(StoreHandler):
             if k == 'd_ret':        d_ret               = v
             if k == 'client_path':  str_clientPath      = v
             if k == 'configPath':   configPath          = v
+            if k == 'key':          key                 = v
 
         swiftService = self._createSwiftService(configPath)
 
         if not b_zip:
-            with zipfile.ZipFile('/tmp/data.zip', 'w', compression=zipfile.ZIP_DEFLATED) as zipfileObj:
+            with zipfile.ZipFile('/tmp/{}.zip'.format(key), 'w', compression=zipfile.ZIP_DEFLATED) as zipfileObj:
                 with zipfileObj.open(str_clientPath.split('/')[-1], 'wb') as entry:
                     copyfileobj(inputStream, entry)
         else:
-            f = open('/tmp/data.zip', 'wb')
+            f = open('/tmp/{}.zip'.format(key), 'wb')
             buf = 16*1024
             while 1:
                 chunk = inputStream.read(buf)
@@ -73,7 +74,7 @@ class SwiftStore(StoreHandler):
             f.close()
         try:
             success = True
-            uploadObject = swift_service.SwiftUploadObject('/tmp/data.zip', object_name="input/data")
+            uploadObject = swift_service.SwiftUploadObject('/tmp/{}.zip'.format(key), object_name="input/data")
             uploadResultsGenerator = swiftService.upload(str_containerName, [uploadObject])
             # generates dicts containing the results of the upload
             for res in uploadResultsGenerator:

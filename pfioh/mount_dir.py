@@ -37,9 +37,6 @@ class MountDir(StoreHandler):
             if k == 'is_zip': b_zip                 = v
             if k == 'd_ret': d_ret                  = v
         
-        if not os.path.exists(os.path.join(str_destPath, "outgoing")):
-            os.mkdir(os.path.join(str_destPath, "outgoing"))
-        str_destPath = os.path.join(str_destPath, "incoming")
         if not os.path.exists(str_destPath):
             os.mkdir(str_destPath)
         if b_zip:
@@ -55,11 +52,8 @@ class MountDir(StoreHandler):
                     break
                 f.write(chunk)
             f.close()
-        d_ret['write']['file']      = fileName
         d_ret['write']['status']    = True
         d_ret['write']['msg']       = 'File written successfully!'
-        # d_ret['write']['filesize']  = "{:,}".format(fileSize)
-        # d_ret['write']['filesize']  = "{:,}".format(os.stat(fileName).st_size)
         d_ret['write']['timestamp'] = '%s' % datetime.datetime.now()
         d_ret['status']             = True
         d_ret['msg']                = d_ret['write']['msg']
@@ -78,15 +72,15 @@ class MountDir(StoreHandler):
             if k== 'is_zip': b_zip= v
             if k== 'cleanup': b_cleanup= v
             if k== 'd_ret': d_ret= v
+            if k== 'key': key= v
     
-        str_localPath = os.path.join(str_localPath, "outgoing")
         if b_zip:
-            with zipfile.ZipFile('/tmp/data.zip', 'w', compression=zipfile.ZIP_DEFLATED) as zipfileObj:
+            with zipfile.ZipFile('/tmp/{}.zip'.format(key), 'w', compression=zipfile.ZIP_DEFLATED) as zipfileObj:
                 for root, dirs, files in os.walk(str_localPath):
                     for filename in files:
                         arcname = os.path.join(root, filename)[len(str_localPath.rstrip(os.sep))+1:]
                         zipfileObj.write(os.path.join(root, filename), arcname=arcname)
-                        fileToProcess = "/tmp/data.zip"
+                        fileToProcess = "/tmp/{}.zip".format(key)
         else:
             fileToProcess = os.walk(str_localPath).next()[2][0]
         d_ret['status'] = True
