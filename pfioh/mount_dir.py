@@ -31,38 +31,31 @@ class MountDir(StoreHandler):
         """
 
         for k,v in kwargs.items():
-            if k == 'file_name': fileName  = v
-            if k == 'file_content': fileContent = v
-            if k == 'Path': unpackPath= v
-            if k == 'is_zip': b_zip= v
-            if k == 'd_ret': d_ret= v
-
-        try:
-            with open(fileName, 'wb') as fh:
-                try:
-                    fh.write(fileContent)
-                except Exception as err:
-                    self.dp.qprint(err)
-
-        finally:
-            if b_zip:
-                d_fio = zip_process(
-                    action= 'unzip',
-                    path= unpackPath,
-                    payloadFile = fileName
-                )
-                d_ret['unzip']  = d_fio
-                d_ret['status'] = d_fio['status']
-                d_ret['msg']    = d_fio['msg']
-                d_ret['write']['filesize']  = "{:,}".format(self.getSize(fileName))
-                os.remove(fileName)
-
-        # pudb.set_trace()
-        d_ret['write']['file']      = fileName
+            if k == 'input_stream': inputStream     = v
+            if k == 'client_path': str_clientPath   = v
+            if k == 'path': str_destPath            = v
+            if k == 'is_zip': b_zip                 = v
+            if k == 'd_ret': d_ret                  = v
+        
+        if not os.path.exists(str_destPath):
+            os.mkdir(str_destPath)
+        if b_zip:
+            with zipfile.ZipFile(inputStream, 'r') as zipfileObj:
+                zipfileObj.extractall(path=str_destPath)
+            d_ret['write']['file'] = str_destPath
+        else:
+            filePath = os.path.join(str_destPath, str_clientPath.split('/')[-1])
+            f = open(filePath, 'wb')
+            buf = 16*1024
+            while 1:
+                chunk = inputStream.read(buf)
+                if not chunk:
+                    break
+                f.write(chunk)
+            f.close()
+            d_ret['write']['file'] = filePath
         d_ret['write']['status']    = True
         d_ret['write']['msg']       = 'File written successfully!'
-        # d_ret['write']['filesize']  = "{:,}".format(fileSize)
-        # d_ret['write']['filesize']  = "{:,}".format(os.stat(fileName).st_size)
         d_ret['write']['timestamp'] = '%s' % datetime.datetime.now()
         d_ret['status']             = True
         d_ret['msg']                = d_ret['write']['msg']
@@ -77,85 +70,27 @@ class MountDir(StoreHandler):
         """
 
         for k,v in kwargs.items():
-            if k== 'path': str_fileToProcess= v 
+            if k== 'path': str_localPath= v 
             if k== 'is_zip': b_zip= v
             if k== 'cleanup': b_cleanup= v
             if k== 'd_ret': d_ret= v
+            if k== 'key': key= v
     
-        #Zipping
         if b_zip:
-            self.dp.qprint("Zipping target '%s'..." % str_fileToProcess, comms = 'status')
- 
-            str_dirSuffix   = ""
-            # Ensure that directory paths end in '/'
-            if os.path.isdir(str_fileToProcess) and str_fileToProcess[-1] != '/':
-                str_dirSuffix   = '/'
-            d_fio   = zip_process(
-                action  = 'zip',
-                path    = str_fileToProcess,
-                arcroot = str_fileToProcess + str_dirSuffix
-            )
-            d_ret['zip']        = d_fio
-            d_ret['status']     = d_fio['status']
-            d_ret['msg']        = d_fio['msg']
-            d_ret['timestamp']  = '%s' % datetime.datetime.now()
-           
-            if not d_ret['status']:
-                self.dp.qprint("An error occurred during the zip operation:\n%s" % d_ret['msg'],
-                             comms = 'error')
-                self.ret_client(d_ret)
-                return d_ret
-
-            str_fileToProcess        = d_fio['fileProcessed']
-            str_zipFile              = str_fileToProcess
-            d_ret['zip']['filesize'] = self.getSize(str_fileToProcess)
-            self.dp.qprint("Zip file: " + Colors.YELLOW + "%s" % str_zipFile +
-                Colors.PURPLE + '...' , comms = 'status')
-
-        try:
-            #Reading from file
-            d_ret = self.readData(str_fileToProcess, d_ret)
-
-        finally:
-            #Cleanup by deleting temporary files
-            if b_cleanup:
-                if b_zip:
-                    self.dp.qprint("Removing '%s'..." % (str_zipFile), comms = 'status')
-                    if os.path.isfile(str_zipFile):     os.remove(str_zipFile)
+            with zipfile.ZipFile('/tmp/{}.zip'.format(key), 'w', compression=zipfile.ZIP_DEFLATED) as zipfileObj:
+                for root, dirs, files in os.walk(str_localPath):
+                    for filename in files:
+                        arcname = os.path.join(root, filename)[len(str_localPath.rstrip(os.sep))+1:]
+                        zipfileObj.write(os.path.join(root, filename), arcname=arcname)
+                        fileToProcess = "/tmp/{}.zip".format(key)
+        else:
+            fileToProcess = os.walk(str_localPath).next()[2][0]
+        d_ret['status'] = True
+        d_ret['msg'] = "File/Directory downloaded"
+        self.buffered_response(fileToProcess)
+        if b_cleanup:
+            if b_zip:
+                self.dp.qprint("Removing '%s'..." % (fileToProcess), comms = 'status')
+                #if os.path.isfile(fileToProcess): os.remove(fileToProcess)
 
         return d_ret
-
-
-    def readData(self, str_fileToProcess, d_ret):
-        """
-        Reads the data from the file and writes it for transferring over the network
-        """
-
-        with open(str_fileToProcess, 'rb') as fh:
-            filesize    = os.stat(str_fileToProcess).st_size
-            self.dp.qprint("Transmitting " + Colors.YELLOW + "{:,}".format(filesize) + Colors.PURPLE +
-                        " target bytes from " + Colors.YELLOW + 
-                        "%s" % (str_fileToProcess) + Colors.PURPLE + '...', comms = 'status')
-            self.send_response(200)
-            # self.send_header('Content-type', 'text/json')
-            self.end_headers()
-            # try:
-            #     self.wfile.write(fh.read().encode())
-            # except:
-            self.dp.qprint('<transmission>', comms = 'tx')
-            d_ret['transmit']               = {}
-            d_ret['transmit']['msg']        = 'transmitting'
-            d_ret['transmit']['timestamp']  = '%s' % datetime.datetime.now()
-            d_ret['transmit']['filesize']   = '%s' % os.stat(str_fileToProcess).st_size
-            d_ret['status']                 = True
-            d_ret['msg']                    = d_ret['transmit']['msg']
-            self.wfile.write(fh.read())
-
-        return d_ret
-
-    def getSize(self, str_fileToProcess):
-        """
-        Returns the size of the given file
-        """
-        
-        return os.stat(str_fileToProcess).st_size
