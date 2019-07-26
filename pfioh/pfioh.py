@@ -18,6 +18,8 @@ import  shutil
 import  datetime
 import  tempfile
 import  pprint
+import  time
+import  binascii
 
 import  platform
 import  socket
@@ -28,7 +30,7 @@ import  inspect
 import  pudb
 import  inspect
 import  pfmisc
-from pfmisc.Auth import Auth
+from    pfmisc.Auth     import Auth
 
 # pfioh local dependencies
 from    pfmisc._colors  import Colors
@@ -194,9 +196,7 @@ class StoreHandler(BaseHTTPRequestHandler):
         :return:
         """
 
-        # d_msg               = ast.literal_eval(d_server)
         d_meta              = d_msg['meta']
-        # d_local             = d_meta['local']
         d_remote            = d_meta['remote']
         d_transport         = d_meta['transport']
         d_compress          = d_transport['compress']
@@ -210,16 +210,18 @@ class StoreHandler(BaseHTTPRequestHandler):
         str_fileToProcess   = str_serverPath
 
         b_cleanup           = False
-        # b_zip               = True
-        
+
         if 'cleanup' in d_compress: b_cleanup = d_compress['cleanup']
 
         str_archive         = d_compress['archive']
-        if str_archive == 'zip':    b_zip = True
-        else:                       b_zip = False
-        if os.path.isdir(str_serverPath):
-            b_zip           = True
-            # str_archive    = 'zip'
+        if str_archive == 'zip':            b_zip   = True
+        else:                               b_zip   = False
+        if os.path.isdir(str_serverPath):   b_zip   = True
+
+        # pudb.set_trace()
+        # The 'key' is an IMPLICIT parameter used by CUBE. 
+        if 'key' not in d_remote:
+            d_remote['key'] = '%s' % uuid.uuid4()
 
         d_ret = self.getData(
                                 path        = str_fileToProcess, 
@@ -230,7 +232,7 @@ class StoreHandler(BaseHTTPRequestHandler):
                             )
         d_ret['postop']      = self.do_GET_postop(  meta          = d_meta)
         self.ret_client(d_ret)
-        self.dp.qprint(self.pp.pformat(d_ret).strip(), comms = 'tx')
+        self.dp.qprint(json.dumps(d_ret, indent = 4), comms = 'tx')
 
         return d_ret
 
@@ -653,7 +655,7 @@ class StoreHandler(BaseHTTPRequestHandler):
         Return headers of the request
         """
         
-        self.dp.qprint('headers= %s' %self.headers)
+        # self.dp.qprint('http headers received = \n%s' % self.headers, comms = 'status')
         return int(self.headers['content-length'])
 
     def rfileRead(self, length):
@@ -665,17 +667,43 @@ class StoreHandler(BaseHTTPRequestHandler):
 
     def unpackForm(self, form, d_form):
         """
-        Load the json request
+        Load the json request.
+
+        Note that anecdotal testing at times seemed to have incomplete
+        form data. Currently, this method will attempt to wait in the
+        hope that the form contents have not been fully transmitted.
         """
 
+        waitLoop    = 5
+        waitSeconds = 5
+        b_status    = False
+        d_msg       = {}
+
         self.dp.qprint("Unpacking multi-part form message...", comms = 'status')
-        for key in form:
-            if key == "local":
-                d_form[key] = form[key].file
-            else:
-                self.dp.qprint("\tUnpacking field '%s..." % key, comms = 'status')
-                d_form[key]     = form.getvalue(key)
-        d_msg = json.loads(d_form['d_msg'])
+        self.dp.qprint('form length = %d' % len(form), comms = 'status')
+        self.dp.qprint('form keys   = %s' % form.keys())
+        for w in range(0, waitLoop):
+            if 'd_msg' not in form:
+                self.dp.qprint("\tPossibly FATAL error -- no 'd_msg' found in form!",
+                                comms = 'error')
+                self.dp.qprint("\tWaiting for %d seconds. Waitloop %d of %d..." % \
+                                (waitSeconds, w, waitLoop),
+                                comms = 'error')
+                time.sleep(waitSeconds)
+            if len(form) == 3:
+                for key in form:
+                    self.dp.qprint("\tUnpacking field '%s..." % key, comms = 'rx')
+                    if key == "local":
+                        d_form[key] = form[key].file
+                    else:
+                        d_form[key]     = form.getvalue(key)
+                b_status    = True
+                break
+        if b_status:
+            d_msg = json.loads(d_form['d_msg'])
+        d_msg['status'] = b_status
+        if not b_status:
+            d_msg['errorMessage'] = "FORM reception possibly incomplete."
 
         return d_msg
 
@@ -686,91 +714,173 @@ class StoreHandler(BaseHTTPRequestHandler):
         else:
             self.denyAuth()
 
+    def do_POST_dataParse(self):
+        """
+        Return a structure containing the data POSTED by a remote client
+        """
+
+        b_fileStream        = False
+        d_ret               = {
+            'status':       True,
+            'mode':         '',
+            'd_data':       {},
+            'form':         None,
+            'd_form':       {}
+        }
+
+        self.dp.qprint("Headers received = \n" + str(self.headers), 
+                        comms = 'rx')
+
+        if 'Mode' in self.headers:
+            if self.headers['mode'] != 'control':
+                b_fileStream    = True
+                d_ret['mode']   = 'form'
+            else:
+                d_ret['mode']   = 'control'   
+        if b_fileStream:
+            form                = self.form_get('POST')
+            if len(form):
+                d_ret['form']   = form 
+                d_ret['d_data'] = self.unpackForm(form, d_ret['d_form'])
+                d_ret['status'] = d_ret['d_data']['status']
+        else:
+            self.dp.qprint("Parsing JSON data...", comms = 'status')
+            length          = self.getContentLength()
+            d_post          = json.loads(self.rfile.read(length).decode())
+            try:
+                d_ret['d_data'] = d_post['payload']
+            except:
+                d_ret['d_data'] = d_post
+
+        return d_ret
+
+    def do_POST_actionParse(self, d_msg):
+        """
+        Parse the "action" passed by the client.
+
+        Essentially, any "action" string passed by the client is mapped
+        to a method <action>_process() -- of course assuming that this
+        method exists.
+        """
+
+        # Default result dictionary. Note that specific methods
+        # might return a different dictionary. It is NOT safe to
+        # assume that all action processing methods will honor this
+        # tempate.
+        d_actionResult      = {
+            'status':       True,
+            'msg':          ''
+        }
+
+        self.dp.qprint("verb: %s detected." % d_msg['action'], comms = 'status')
+        str_method      = '%s_process' % d_msg['action']
+        self.dp.qprint("method to call: %s(request = d_msg) " % str_method, comms = 'status')
+        try:
+            method              = getattr(self, str_method)
+            d_actionResult      = method(request = d_msg)
+        except:
+            str_msg     = "Class '{}' does not implement method '{}'".format(
+                                    self.__class__.__name__, 
+                                    str_method)
+            d_actionResult      = {
+                'status':   False,
+                'msg':      str_msg
+            }
+            self.dp.qprint(str_msg, comms = 'error')
+        self.dp.qprint(json.dumps(d_actionResult, indent = 4), comms = 'tx')
+        
+        return d_actionResult
+
+    def do_POST_transportParse(self, d_meta, d_postParse):
+        """
+        Parse the POST file transfer operation -- since POST is from the
+        client perspective, this means from the server perspective that
+        data is INCOMING.
+        """
+
+        d_ret      = {
+            'status':       False,
+            'msg':          ''
+        }
+
+        d_transport     = d_meta['transport']
+        length          = self.getContentLength()
+        if 'compress' in d_transport:
+            d_ret       = self.do_POST_withCompression(
+                length  = length,
+                form    = d_postParse['form'],
+                d_form  = d_postParse['d_form'] 
+            )
+        if 'copy' in d_transport :
+            if Gd_internalvar['b_swiftStorage']:
+                d_ret   = self.do_POST_withCompression(
+                    length  = length,
+                    form    = d_postParse['form'],
+                    d_form  = d_postParse['d_form']
+                )
+            else:
+                d_ret   = self.do_POST_withCopy(d_meta)
+        return d_ret
+
     def execute_POST(self, **kwargs):
+        """
+        The main logic for processing POST directives from the client.
+
+        This method will extract both meta (i.e. control-mode)
+        as well as payload (i.e. data-mode or form-mode)
+        directives .
+        """
+
         b_skipInit  = False
-        d_msg       = {}
+        d_msg       = {
+            'status':   False
+        }
+        d_postParse = {
+            'status':   False
+        }
+
         for k,v in kwargs.items():
-            self.dp.qprint('in for ' +  str(k))
             if k == 'd_msg':
                 d_msg       = v
                 b_skipInit  = True
+        
+        if not b_skipInit: 
+            d_postParse     = self.do_POST_dataParse()
+            try:
+                d_msg                   = d_postParse['d_data']
+            except:
+                d_msg['errorMessage']   = "No 'd_data' in postParse."
 
-        if not b_skipInit:
-            # Parse the form data posted
-            self.dp.qprint(str(self.headers), comms = 'rx')
+        self.dp.qprint('d_msg = \n%s' % 
+                        json.dumps(
+                            d_msg, indent = 4
+                        ), comms = 'status')
 
-            form                = self.form_get('POST')
-            d_form              = {}
-            d_ret               = {
-                'msg'      : 'In do_POST',
-                'status'   : True,
-                'formsize' : sys.getsizeof(form)
-            }
-            self.dp.qprint('form length = %d' % len(form), comms = 'status')
+        if d_postParse['status']:
+            d_meta      = d_msg['meta']
 
-            if len(form):
-                d_msg = self.unpackForm(form, d_form)
-            else:
-                self.dp.qprint("Parsing JSON data...", comms = 'status')
-                length              = self.getContentLength()
-                d_data              = json.loads(self.rfile.read(length).decode())
-                try:
-                    d_msg           = d_data['payload']
-                except:
-                    d_msg           = d_data
+            if 'action' in d_msg and 'transport' not in d_meta:  
+                d_ret   = self.do_POST_actionParse(d_msg)
 
-        self.dp.qprint('d_msg = %s' % self.pp.pformat(d_msg).strip(), comms = 'status')
-        d_meta              = d_msg['meta']
+            if 'ctl' in d_meta:
+                d_ret   = self.do_POST_serverctl(d_meta)
 
-        if 'action' in d_msg:
-            self.dp.qprint("verb: %s detected." % d_msg['action'], comms = 'status')
-            if 'Path' not in d_msg['action']:
-                str_method      = '%s_process' % d_msg['action']
-                self.dp.qprint("method to call: %s(request = d_msg) " % str_method, comms = 'status')
-                d_done          = {'status': False}
-                try:
-                    method      = getattr(self, str_method)
-                    d_done      = method(request = d_msg)
-                except:
-                    str_msg     = "Class '{}' does not implement method '{}'".format(self.__class__.__name__, 
-                                                                                     str_method)
-                    d_done = {
-                        'status':   False,
-                        'msg':      str_msg
-                    }
-                    self.dp.qprint(str_msg, comms = 'error')
-                self.dp.qprint(self.pp.pformat(d_done).strip(), comms = 'tx')
-                d_ret = d_done
+            if 'transport' in d_meta:
+                d_ret   = self.do_POST_transportParse(d_meta, d_postParse)
 
-        if 'ctl' in d_meta:
-            self.do_POST_serverctl(d_meta)
-
-        if 'transport' in d_meta:
-            d_transport     = d_meta['transport']
-            if 'compress' in d_transport:
-                d_ret       = self.do_POST_withCompression(
-                    length  = self.getContentLength(),
-                    form    = form,
-                    d_form  = d_form 
-                )
-            if 'copy' in d_transport :
-                if Gd_internalvar['b_swiftStorage']:
-                    d_ret   = self.do_POST_withCompression(
-                        length  = length,
-                        form    = form,
-                        d_form  = d_form
-                    )
-                else:
-                    d_ret   = self.do_POST_withCopy(d_meta)
-
-
-        if not b_skipInit: self.ret_client(d_ret)
+            if not b_skipInit: self.ret_client(d_ret)
+        else:
+            d_ret       = d_msg
         return d_ret
 
     def do_POST_serverctl(self, d_meta):
         """
         """
-        d_ctl               = d_meta['ctl']
+        d_ctl   = d_meta['ctl']
+        d_ret   = {
+            'status':   True,
+            'msg':      ''
+        }
         self.dp.qprint('Processing server ctl...', comms = 'status')
         self.dp.qprint(d_meta, comms = 'rx')
         if 'serverCmd' in d_ctl:
@@ -783,6 +893,7 @@ class StoreHandler(BaseHTTPRequestHandler):
                 self.dp.qprint(d_ret, comms = 'tx')
                 self.ret_client(d_ret)
                 os._exit(0)
+        return d_ret
 
     def do_POST_withCopy(self, d_meta):
         """
@@ -1011,58 +1122,49 @@ class StoreHandler(BaseHTTPRequestHandler):
 
     def do_POST_withCompression(self, **kwargs):
 
-        # Parse the form data posted
+        # Unpack the file stream that has been transmitted in
+        # the POSTED form data.
 
         self.dp.qprint(str(self.headers),              comms = 'rx')
         self.dp.qprint('do_POST_withCompression()',    comms = 'status')
 
-        # data    = None
-        # length  = 0
-        # form    = None
-        d_form  = {}
-        d_ret   = {}
+        d_form              = {}
+        d_ret               = {}
+        d_ret['write']      = {}
 
         for k,v in kwargs.items():
-            # if k == 'data':     data    = v
-            # if k == 'length':   length  = v
-            # if k == 'form':     form    = v
             if k == 'd_form':   d_form  = v
 
         d_msg               = json.loads((d_form['d_msg']))
         d_meta              = d_msg['meta']
-        # d_meta              = json.loads(d_form['d_meta'])
         inputStream         = d_form['local']
-        
         str_fileName        = d_meta['local']['path']
-
         d_remote            = d_meta['remote']
         b_unpack            = False
-        # b_serverPath        = False
-        # str_unpackBase      = self.server.str_fileBase
-
         str_unpackPath      = self.remoteLocation_resolve(d_remote)['path']
-        str_unpackBase      = os.path.join(str_unpackPath,'')
         d_transport         = d_meta['transport']
         d_compress          = d_transport['compress']
+
         if 'unpack' in d_compress:
             b_unpack        = d_compress['unpack']
+        b_zip               = b_unpack and (d_compress['archive'] == 'zip')
 
-        #Decoding 
-        d_ret['write']   = {}
-
-        b_zip = b_unpack and (d_compress['archive'] == 'zip')
+        # The 'key' is an IMPLICIT parameter used by CUBE. 
+        if 'key' not in d_remote:
+            d_remote['key'] = d_form['filename']
 
         d_ret = self.storeData(
-            client_path = str_fileName,
-            input_stream = inputStream,
-            path = str_unpackPath,
-            is_zip = b_zip,
-            key = d_remote['key'],
-            d_ret = d_ret)
+            client_path     = str_fileName,
+            input_stream    = inputStream,
+            path            = str_unpackPath,
+            is_zip          = b_zip,
+            key             = d_remote['key'],
+            d_ret           = d_ret)
         
-        d_ret['postop'] = self.do_POST_postop(meta          = d_meta,
-                                              path          = str_unpackPath)
-
+        d_ret['postop'] = self.do_POST_postop(
+            meta          = d_meta,
+            path          = str_unpackPath
+        )
 
         self.send_response(200)
         self.end_headers()
@@ -1166,7 +1268,6 @@ class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
                 Gd_internalvar['authModule']        = Auth('http', self.args['str_tokenPath'])
             else:
                 Gd_internalvar['authModule']        = Auth('http', 'pfioh_config.cfg')
-        print(self.str_desc)
 
         self.col2_print("Listening on address:",    self.args['ip'])
         self.col2_print("Listening on port:",       self.args['port'])
