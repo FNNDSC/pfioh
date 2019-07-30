@@ -696,19 +696,14 @@ class StoreHandler(BaseHTTPRequestHandler):
                 b_skipInit  = True
 
         if not b_skipInit:
-            # Parse the form data posted
-            self.dp.qprint(str(self.headers), comms = 'rx')
-
-            form                = self.form_get('POST')
-            d_form              = {}
-            d_ret               = {
-                'msg'      : 'In do_POST',
-                'status'   : True,
-                'formsize' : sys.getsizeof(form)
-            }
-            self.dp.qprint('form length = %d' % len(form), comms = 'status')
-
-            if len(form):
+            if self.headers['File'] == 'true':
+                form                = self.form_get('POST')
+                d_form              = {}
+                d_ret               = {
+                    'msg'      : 'In do_POST',
+                    'status'   : True,
+                    'formsize' : sys.getsizeof(form)
+                }
                 d_msg = self.unpackForm(form, d_form)
             else:
                 self.dp.qprint("Parsing JSON data...", comms = 'status')
