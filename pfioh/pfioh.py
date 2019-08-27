@@ -127,9 +127,6 @@ class StoreHandler(BaseHTTPRequestHandler):
         if Gd_internalvar['b_swiftStorage']:
             b_status= True
             str_remotePath= d_remote['key']
-        elif 'path' in d_remote.keys():
-            str_remotePath  = d_remote['path']
-            b_status        = True
         elif 'key' in d_remote.keys():
             d_ret =  self.storage_resolveBasedOnKey(key = d_remote['key'])
             if d_ret['status']:
