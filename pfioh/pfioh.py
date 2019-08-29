@@ -36,6 +36,9 @@ from    pfmisc.Auth     import Auth
 from    pfmisc._colors  import Colors
 from    pfmisc.debug    import debug
 
+# pfstorage modules
+from pfstorage import PfStorage
+
 # Global var
 Gd_internalvar = {
     'name':                 "pfioh",
@@ -396,7 +399,7 @@ class StoreHandler(BaseHTTPRequestHandler):
             if k == 'key':  str_key = v
 
         if len(str_key):
-            str_internalLocation    = os.path.join('%s/key-%s' %(Gd_internalvar['storeBase'], str_key),'')
+            str_internalLocation    = PfStorage.getStoragePath(str_key, Gd_internalvar['storeBase'])
             Gd_internalvar['key2address'][str_key]  = str_internalLocation
             b_status                = True
 

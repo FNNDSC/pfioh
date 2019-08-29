@@ -37,7 +37,7 @@ class MountDir(StoreHandler):
             if k == 'is_zip': b_zip                 = v
             if k == 'd_ret': d_ret                  = v
         
-        if str_destPath == '':
+        if not str_destPath:
             d_ret['write']['status']    = False
             d_ret['write']['msg']       = 'Key not found!'
             d_ret['write']['timestamp'] = '%s' % datetime.datetime.now()
