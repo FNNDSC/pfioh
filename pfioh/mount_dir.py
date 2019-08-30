@@ -37,6 +37,14 @@ class MountDir(StoreHandler):
             if k == 'is_zip': b_zip                 = v
             if k == 'd_ret': d_ret                  = v
         
+        if not str_destPath:
+            d_ret['write']['status']    = False
+            d_ret['write']['msg']       = 'Key not found!'
+            d_ret['write']['timestamp'] = '%s' % datetime.datetime.now()
+            d_ret['status']             = False
+            d_ret['msg']                = d_ret['write']['msg']
+            return d_ret
+
         if not os.path.exists(str_destPath):
             os.mkdir(str_destPath)
         if b_zip:
@@ -87,7 +95,14 @@ class MountDir(StoreHandler):
             fileToProcess = os.walk(str_localPath).next()[2][0]
         d_ret['status'] = True
         d_ret['msg'] = "File/Directory downloaded"
-        self.buffered_response(fileToProcess)
+
+        try:
+            self.buffered_response(fileToProcess)
+        except UnboundLocalError:
+            d_ret['status'] = False
+            d_ret['msg'] = "Key not found!"
+            return d_ret
+
         if b_cleanup:
             if b_zip:
                 self.dp.qprint("Removing '%s'..." % (fileToProcess), comms = 'status')

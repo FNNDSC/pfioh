@@ -36,6 +36,9 @@ from    pfmisc.Auth     import Auth
 from    pfmisc._colors  import Colors
 from    pfmisc.debug    import debug
 
+# pfstorage modules
+from pfstorage import PfStorage
+
 # Global var
 Gd_internalvar = {
     'name':                 "pfioh",
@@ -127,9 +130,6 @@ class StoreHandler(BaseHTTPRequestHandler):
         if Gd_internalvar['b_swiftStorage']:
             b_status= True
             str_remotePath= d_remote['key']
-        elif 'path' in d_remote.keys():
-            str_remotePath  = d_remote['path']
-            b_status        = True
         elif 'key' in d_remote.keys():
             d_ret =  self.storage_resolveBasedOnKey(key = d_remote['key'])
             if d_ret['status']:
@@ -399,7 +399,7 @@ class StoreHandler(BaseHTTPRequestHandler):
             if k == 'key':  str_key = v
 
         if len(str_key):
-            str_internalLocation    = os.path.join('%s/key-%s' %(Gd_internalvar['storeBase'], str_key),'')
+            str_internalLocation    = PfStorage.getStoragePath(str_key, Gd_internalvar['storeBase'])
             Gd_internalvar['key2address'][str_key]  = str_internalLocation
             b_status                = True
 
