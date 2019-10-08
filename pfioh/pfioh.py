@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 
+import logging
+logging.disable(logging.CRITICAL)
+
 import  sys
 import  stat
 
@@ -328,7 +331,6 @@ class StoreHandler(BaseHTTPRequestHandler):
     def denyAuth(self):
         d_ret = {
                 "message": "Unauthorized Client Request",
-                "error": error,
                 'status': False
                 }
 
@@ -964,11 +966,16 @@ class StoreHandler(BaseHTTPRequestHandler):
         d_ret           = {}
         b_status        = False
         str_path        = ''
+        b_openshift     = False
+
         for k,v in kwargs.items():
             if k == 'meta':         d_meta          = v
             if k == 'path':         str_path        = v
 
-        if 'specialHandling' in d_meta:
+        if 'serviceMan' in d_meta.keys():
+            b_openshift = d_meta['serviceMan'] == 'openshift'
+
+        if 'specialHandling' in d_meta and not b_openshift:
             d_preop = d_meta['specialHandling']
             if 'cmd' in d_preop.keys():
                 str_cmd     = d_postop['cmd']
@@ -1021,11 +1028,15 @@ class StoreHandler(BaseHTTPRequestHandler):
         d_ret           = {}
         b_status        = False
         str_path        = ''
+        b_openshift     = False
 
         for k,v in kwargs.items():
             if k == 'meta':         d_meta          = v
 
-        if 'specialHandling' in d_meta:
+        if 'serviceMan' in d_meta.keys():
+            b_openshift = d_meta['serviceMan'] == 'openshift'
+
+        if 'specialHandling' in d_meta and not b_openshift:
             d_postop = d_meta['specialHandling']
             if 'cleanup' in d_postop.keys():
                 if d_postop['cleanup']:
@@ -1067,12 +1078,15 @@ class StoreHandler(BaseHTTPRequestHandler):
         d_ret           = {}
         b_status        = False
         str_path        = ''
+        b_openshift     = False
 
         for k,v in kwargs.items():
             if k == 'meta':         d_meta          = v
             if k == 'path':         str_path        = v
 
-        if 'specialHandling' in d_meta:
+        if 'serviceMan' in d_meta.keys():
+            b_openshift = d_meta['serviceMan'] == 'openshift'
+        if 'specialHandling' in d_meta and not b_openshift:
             d_postop = d_meta['specialHandling']
             if 'cmd' in d_postop.keys():
                 str_cmd     = d_postop['cmd']
