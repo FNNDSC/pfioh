@@ -3,7 +3,7 @@
 # (c) 2017- Fetal-Neonatal Neuroimaging & Developmental Science Center
 #                   Boston Children's Hospital
 #
-#                        http://fnndsc.org
+#              http://childrenshospital.org/FNNDSC/
 #                        dev@babyMRI.org
 #
 
@@ -22,17 +22,27 @@ import  pudb
 sys.path.insert(1, os.path.join(os.path.dirname(__file__), '../pfioh'))
 try:
     import pfioh
-    import mount_dir    as MountDir
-    import swift_store  as SwiftStore
+    import mount_dir
+    import swift_store
 except:
-    import pfioh
-    from   pfioh.mount_dir      import MountDir         as MountDir
-    from   pfioh.swift_store    import SwiftStore       as SwiftStore
+    # system lib path
+    sys.path.insert(1, os.path.join(get_python_lib(True, True), 'site-packages'))
+    sys.path.insert(1, os.path.join(get_python_lib(True, True), 'site-packages/pfioh'))
+    # virtual env lib path
+    sys.path.insert(1, os.path.join(get_python_lib(True, False), 'site-packages/pfioh'))
+    try:
+        import pfioh
+        from   pfioh.mount_dir      import MountDir
+        from   pfioh.swift_store    import SwiftStore
+    except:
+        import pfioh
+        import mount_dir
+        import swift_store
 
 from    pfmisc._colors             import Colors
 
 str_defIP   = [l for l in ([ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")][:1], [[(s.connect(('8.8.8.8', 53)), s.getsockname()[0], s.close()) for s in [socket.socket(socket.AF_INET, socket.SOCK_DGRAM)]][0][1]]) if l][0][0]
-str_version = "2.2.0.4"
+str_version = "2.1.1.6"
 str_desc    = Colors.CYAN + """
         __ _       _
        / _(_)     | |
@@ -47,13 +57,6 @@ str_desc    = Colors.CYAN + """
                             Path-File-IO-over-HTTP
 
            A simple IO handler that pushes/pulls file paths over http
-
-        (c) 2017+ Fetal-Neonatal Neuroimaging & Developmental Science Center
-                            Boston Children's Hospital
-
-                               http://fnndsc.org
-                                dev@babyMRI.org
-
 
                               -- version """ + \
              Colors.YELLOW + str_version + Colors.CYAN + """ --
@@ -344,7 +347,7 @@ if args.b_version:
 if args.b_swiftStorage:
     server = pfioh.ThreadedHTTPServer((args.ip, args.port), swift_store.SwiftStore)
 else:
-    server = pfioh.ThreadedHTTPServer((args.ip, args.port), MountDir) 
+    server = pfioh.ThreadedHTTPServer((args.ip, args.port), mount_dir.MountDir) 
 
 server.setup(args = vars(args), desc = str_desc, ver = str_version)
 

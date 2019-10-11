@@ -40,9 +40,13 @@ RUN apt-get update \
   && echo "localuser:localuser" | chpasswd                            \
   && adduser localuser sudo                                           \
   && apt-get install -y libssl-dev libcurl4-openssl-dev bsdmainutils vim net-tools inetutils-ping \
-  && apt-get install -y libgnutls28-dev                               \
   && pip install --upgrade pip                                        \
-  && pip3 install /tmp/pfioh                                          \  
+  && pip3 install --prefix /usr /tmp/pfioh                            \  
+  && pip3 install pudb                                                \
+  && pip3 install keystoneauth1                                       \
+  && pip3 install python-keystoneclient                               \
+  && pip3 install pfmisc>=1.3.30                                      \
+  && pip3 install python-swiftclient                                  \
   && rm -rf /tmp/pfioh                                                \
   && chmod 777 /dock                                                  \
   && chmod 777 /dock/docker-entrypoint.py                             \

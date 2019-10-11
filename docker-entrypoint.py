@@ -31,7 +31,7 @@ def pfioh_do(args, unknown):
 
     str_otherArgs   = ' '.join(unknown)
 
-    str_CMD = "/usr/local/bin/pfioh --forever %s" % (str_otherArgs)
+    str_CMD = "/usr/bin/pfioh --forever %s" % (str_otherArgs)
     return str_CMD
 
 parser  = argparse.ArgumentParser(description = str_desc)

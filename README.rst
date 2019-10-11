@@ -1,5 +1,5 @@
 ####################
-pfioh - v2.2.0.4
+pfioh - v2.1.1.6
 ####################
 
 .. image:: https://badge.fury.io/py/pfioh.svg
