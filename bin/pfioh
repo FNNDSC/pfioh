@@ -32,7 +32,7 @@ except:
 from    pfmisc._colors             import Colors
 
 str_defIP   = [l for l in ([ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")][:1], [[(s.connect(('8.8.8.8', 53)), s.getsockname()[0], s.close()) for s in [socket.socket(socket.AF_INET, socket.SOCK_DGRAM)]][0][1]]) if l][0][0]
-str_version = "2.2.0.4"
+str_version = "2.2.0.6"
 str_desc    = Colors.CYAN + """
         __ _       _
        / _(_)     | |
@@ -342,7 +342,7 @@ if args.b_version:
     sys.exit(1)
 
 if args.b_swiftStorage:
-    server = pfioh.ThreadedHTTPServer((args.ip, args.port), swift_store.SwiftStore)
+    server = pfioh.ThreadedHTTPServer((args.ip, args.port), SwiftStore)
 else:
     server = pfioh.ThreadedHTTPServer((args.ip, args.port), MountDir) 
 
