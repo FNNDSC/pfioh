@@ -19,7 +19,7 @@ setup(
       author_email     =   'rudolph.pienaar@gmail.com',
       url              =   'https://github.com/FNNDSC/pfioh',
       packages         =   ['pfioh'],
-      install_requires =   ['pycurl', 'pyzmq', 'webob', 'pudb', 'psutil', 'keystoneauth1', 'python-keystoneclient', 'python-swiftclient', 'pfmisc'],
+      install_requires =   ['pycurl', 'pyzmq', 'webob', 'pudb', 'psutil', 'keystoneauth1', 'python-keystoneclient', 'python-swiftclient', 'pfmisc', 'keystoneauth'],
       test_suite       =   'nose.collector',
       tests_require    =   ['nose'],
       scripts          =   ['bin/pfioh'],

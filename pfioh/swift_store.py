@@ -8,12 +8,13 @@ import zipfile
 import os
 import configparser
 from   pfioh                       import StoreHandler
-from   keystoneauth1.identity      import v3
-from   keystoneauth1               import session
+#from   keystoneauth1.identity      import v3
 from   swiftclient                 import service as swift_service
 from   pfmisc._colors              import Colors
 from   shutil                      import copyfileobj
 import pprint
+from keystoneauth1 import identity
+from keystoneauth1 import session
 
 pp = pprint.PrettyPrinter(indent=4)
 
@@ -29,29 +30,42 @@ class SwiftStore(StoreHandler):
         config.readfp(f)
         f.close()
 
-        options = {
-            'auth_version':         3,
-            'os_auth_url':          config['AUTHORIZATION']['osAuthUrl'],
-            'os_username':          config['AUTHORIZATION']['username'],
-            'os_password':          config['AUTHORIZATION']['password'],
-            'os_project_domain_name':    config['PROJECT']['osProjectDomain'],
-            'os_project_name':      config['PROJECT']['osProjectName'],
-            'os_region_name': config['PROJECT']['osRegionName'],
-            'os_identity_provider': config['PROJECT']['osIdentityProvider'],
-            'os_protocol': config['PROJECT']['osProtocol'],
-            'os_client_id': config['PROJECT']['osClient'],
-            'os_client_secret': config['PROJECT']['osClientSecret'],
-            'os_access_token': config['PROJECT']['osAccessToken'],
-            'os_discovery_endpoint': config['PROJECT']['osDiscoveryEndpoint'],
-            'os_interface': config['PROJECT']['osInterface'],
-            'os_identity_api_version': config['PROJECT']['osIdentityApiVersion']
-        }
+        # options = {
+        #     'auth_version':         3,
+        #     'os_auth_url':          config['AUTHORIZATION']['osAuthUrl'],
+        #     'os_username':          config['AUTHORIZATION']['username'],
+        #     'os_password':          config['AUTHORIZATION']['password'],
+        #     'os_project_domain_name':    config['PROJECT']['osProjectDomain'],
+        #     'os_project_name':      config['PROJECT']['osProjectName'],
+        #     'os_region_name': config['PROJECT']['osRegionName'],
+        #     'os_identity_provider': config['PROJECT']['osIdentityProvider'],
+        #     'os_protocol': config['PROJECT']['osProtocol'],
+        #     'os_client_id': config['PROJECT']['osClient'],
+        #     'os_client_secret': config['PROJECT']['osClientSecret'],
+        #     'os_access_token': config['PROJECT']['osAccessToken'],
+        #     'os_discovery_endpoint': config['PROJECT']['osDiscoveryEndpoint'],
+        #     'os_interface': config['PROJECT']['osInterface'],
+        #     'os_identity_api_version': config['PROJECT']['osIdentityApiVersion']
+        # }
 
-        service = swift_service.SwiftService(options)
+        auth = identity.v3.oidc.OidcPassword(
+            'https://kaizen.massopen.cloud:13000/v3',
+            identity_provider='moc',
+            protocol='openid',
+            client_id='kaizen-client',
+            client_secret='fac377a9-f2ba-41e7-bb7f-4064dd9f4468',
+            access_token_endpoint='https://sso.massopen.cloud/auth/realms/moc/protocol/openid-connect/token',
+            discovery_endpoint='https://sso.massopen.cloud/auth/realms/moc/.well-known/openid-configuration',
+            username='',
+            password='',
+            project_name='',
+            project_domain_name='Default'
+        )
+        service = session.Session(auth)
         return service
 
-    def storeData(self, **kwargs):
-        """
+
+     #   service = swift_service.SwiftService(options)
         Creates an object of the file and stores it into the container as key-value object 
         """
 
