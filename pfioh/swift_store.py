@@ -35,7 +35,16 @@ class SwiftStore(StoreHandler):
             'os_username':          config['AUTHORIZATION']['username'],
             'os_password':          config['AUTHORIZATION']['password'],
             'os_project_domain_name':    config['PROJECT']['osProjectDomain'],
-            'os_project_name':      config['PROJECT']['osProjectName']
+            'os_project_name':      config['PROJECT']['osProjectName'],
+            'os_region_name': config['PROJECT']['osRegionName'],
+            'os_identity_provider': config['PROJECT']['osIdentityProvider'],
+            'os_protocol': config['PROJECT']['osProtocol'],
+            'os_client_id': config['PROJECT']['osClient'],
+            'os_client_secret': config['PROJECT']['osClientSecret'],
+            'os_access_token': config['PROJECT']['osAccessToken'],
+            'os_discovery_endpoint': config['PROJECT']['osDiscoveryEndpoint'],
+            'os_interface': config['PROJECT']['osInterface'],
+            'os_identity_api_version': config['PROJECT']['osIdentityApiVersion']
         }
 
         service = swift_service.SwiftService(options)
