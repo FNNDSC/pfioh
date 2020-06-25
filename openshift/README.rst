@@ -16,9 +16,9 @@ Assuming oc cluster up has been run.
     # To set the passwords, follow the instructions in the "Setting up authorization" section. Simply editing example-config.cfg DOES NOT DO ANYTHING.
     oc create -f example-secret.yml # Uses the default password ("password")
 
-**************
+*************************
 Setting up authorization
-**************
+*************************
 1) Edit the configuration file:
 
 .. code-block:: bash
@@ -46,9 +46,9 @@ Setting up authorization
     data:
       pfioh_config.cfg: <base64 encoded configuration>
 
-##############
+##################################################################
 Swift Object Store. (Ignore this section if you are using hostDir)
-##############
+##################################################################
 
 The OpenStack Object Store project, known as Swift, offers cloud storage software so that you can store and retrieve lots of data with a simple API. It's built for scale and optimized for durability, availability, and concurrency across the entire data set. Swift is ideal for storing unstructured data that can grow without bound. 
 
@@ -64,19 +64,18 @@ The credentials file for Swift should be stored in a **secret**, mounted at /etc
 
 
 .. code-block:: bash
-    
+
     [AUTHORIZATION]
-    osAuthUrl  =   
-    username   = 
-    password   = 
+    osAuthUrl          =
 
-    [PROJECT]
-    osProjectDomain  = 
-    osProjectName    = 
+    [SECRET]
+    applicationId      =
+    applicationSecret  =
 
-**************
+
+************************************
 Creating a secret and running pfioh.
-**************
+************************************
 1) Create a text file with the name swift-credentials.cfg as shown above (ignore this step if you are running locally).
 
 

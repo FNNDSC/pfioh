@@ -43,7 +43,7 @@
           "spec": {
             "containers": [{
               "command": [
-                "/usr/bin/pfioh",
+                "/usr/local/bin/pfioh",
                 "--forever",
                 "--httpResponse",
                 "--swift-storage",
