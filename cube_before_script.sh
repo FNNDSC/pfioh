@@ -3,8 +3,8 @@
 set -ev
 cd ..
 git clone https://github.com/FNNDSC/ChRIS_ultron_backEnd.git
-pushd pfcon/
-docker build -t fnndsc/pfcon:latest .
+pushd pfioh/
+docker build -t fnndsc/pfioh:latest .
 popd
 pushd ChRIS_ultron_backEnd/
 docker pull fnndsc/swarm
