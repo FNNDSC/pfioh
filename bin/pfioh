@@ -20,6 +20,9 @@ import  pudb
 # development and deployed instances of the 'pfioh.py' module
 # and related dependencies.
 sys.path.insert(1, os.path.join(os.path.dirname(__file__), '../pfioh'))
+
+import signal
+import threading
 try:
     import pfioh
     import mount_dir    as MountDir
@@ -362,6 +365,17 @@ if args.b_test:
     sys.exit(0)
 
 if args.b_forever and not args.b_test:
-    server.serve_forever()
+    def exit_gracefully(signum, frame):
+        print("Gracefully shutting down!...")
+        server.shutdown()
+        server.server_close()
+
+    signal.signal(signal.SIGINT, exit_gracefully)
+    signal.signal(signal.SIGTERM, exit_gracefully)
+
+    # Start a thread with the server -- that thread will then start one
+    # more thread for each request
+    server_thread = threading.Thread(target=server.serve_forever)
+    server_thread.start()
 else:
     server.handle_request()
