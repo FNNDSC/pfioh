@@ -12,14 +12,14 @@ def readme():
 
 setup(
       name             =   'pfioh',
-      version          =   '2.2.0.7',
+      version          =   '2.2.0.6',
       description      =   'Path-and-File-IO-over-HTTP',
       long_description =   readme(),
       author           =   'Rudolph Pienaar',
       author_email     =   'rudolph.pienaar@gmail.com',
       url              =   'https://github.com/FNNDSC/pfioh',
       packages         =   ['pfioh'],
-      install_requires =   ['pycurl', 'pyzmq', 'webob', 'pudb', 'psutil', 'keystoneauth1', 'python-keystoneclient', 'python-swiftclient', 'pfmisc'],
+      install_requires =   ['pycurl', 'pyzmq', 'webob', 'pudb', 'psutil', 'keystoneauth1', 'python-keystoneclient', 'python-swiftclient', 'pfmisc', 'Flask', 'Flask_RESTful'],
       test_suite       =   'nose.collector',
       tests_require    =   ['nose'],
       scripts          =   ['bin/pfioh'],

@@ -12,17 +12,16 @@ import os
 import ast
 from   io                   import BytesIO
 from   io                   import StringIO
-from   pfioh                import StoreHandler
+from   pfioh                import HandleRequests
 from   pfioh                import base64_process, zip_process, zipdir
 from   pfmisc._colors       import Colors
 
 import pudb
 
-class MountDir(StoreHandler):
+class MountDir():
 
     def __init__(self,*args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.dp.qprint('MountDir initialized')
+        HandleRequests.dp.qprint('MountDir initialized')
         
 
     def storeData(self, **kwargs):
@@ -75,7 +74,7 @@ class MountDir(StoreHandler):
             if k == 'cleanup':  b_cleanup       = v
             if k == 'd_ret':    d_ret           = v
             if k == 'key':      key             = v
-    
+
         if b_zip:
             with zipfile.ZipFile('/tmp/{}.zip'.format(key), 'w', compression=zipfile.ZIP_DEFLATED) as zipfileObj:
                 for root, dirs, files in os.walk(str_localPath):
@@ -83,11 +82,14 @@ class MountDir(StoreHandler):
                         arcname = os.path.join(root, filename)[len(str_localPath.rstrip(os.sep))+1:]
                         zipfileObj.write(os.path.join(root, filename), arcname=arcname)
                         fileToProcess = "/tmp/{}.zip".format(key)
+
         else:
             fileToProcess = os.walk(str_localPath).next()[2][0]
         d_ret['status'] = True
         d_ret['msg'] = "File/Directory downloaded"
-        self.buffered_response(fileToProcess)
+
+        self.writeToBuffer(fileToProcess)
+
         if b_cleanup:
             if b_zip:
                 self.dp.qprint("Removing '%s'..." % (fileToProcess), comms = 'status')

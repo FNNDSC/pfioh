@@ -22,6 +22,7 @@ import  datetime
 import  tempfile
 import  pprint
 import  time
+import configparser
 import  binascii
 
 import  platform
@@ -33,11 +34,18 @@ import  inspect
 import  pudb
 import  inspect
 import  pfmisc
+import  email.utils
 from    pfmisc.Auth     import Auth
 
 # pfioh local dependencies
 from    pfmisc._colors  import Colors
 from    pfmisc.debug    import debug
+from    io              import BytesIO
+
+# flask dependencies
+from    flask_restful   import Resource, Api
+from    flask           import request, Response, send_file
+from    flask           import Flask, render_template, __version__
 
 # Global var
 Gd_internalvar = {
@@ -53,8 +61,13 @@ Gd_internalvar = {
     'authModule':           None
 }
 
-class StoreHandler(BaseHTTPRequestHandler):
+StoreHandler = Flask(__name__)
+restful_api = Api(StoreHandler, prefix="/api/v1/cmd")
+StoreHandler.url_map.strict_slashes = False
+suppressFlaskOutput = sys.modules['flask.cli']
+suppressFlaskOutput.show_server_banner = lambda *x: None
 
+class HandleRequests(Resource):
     b_quiet     = False
 
     def __init__(self, *args, **kwargs):
@@ -65,26 +78,21 @@ class StoreHandler(BaseHTTPRequestHandler):
         self.__name__           = 'StoreHandler'
         self.d_ctlVar           = Gd_internalvar
         b_test                  = False
-        self.__b_tokenAuth      = Gd_internalvar['b_tokenAuth']
 
+        self.__b_tokenAuth      = Gd_internalvar['b_tokenAuth']
         self.b_useDebug         = False
         self.str_debugFile      = '/tmp/pfioh-log.txt'
         self.b_quiet            = True
-        self.dp                 = pfmisc.debug(    
+        self.dp                 = pfmisc.debug(
                                             verbosity   = Gd_internalvar['verbosity'],
                                             within      = self.__name__
                                             )
         self.pp                 = pprint.PrettyPrinter(indent=4)
-
-        if self.__b_tokenAuth:
-            self.__auth    = Gd_internalvar['authModule']
+        self.send_file          = False
 
         for k,v in kwargs.items():
             if k == 'test'  : b_test   = True
             if k == 'tokenAuth': self.__b_tokenAuth = v
-
-        if not b_test:
-            BaseHTTPRequestHandler.__init__(self, *args, **kwargs)
 
     def qprint(self, msg, **kwargs):
         str_comms  = ""
@@ -93,7 +101,7 @@ class StoreHandler(BaseHTTPRequestHandler):
 
         str_caller  = inspect.stack()[1][3]
 
-        if not StoreHandler.b_quiet:
+        if not HandleRequests.b_quiet:
             if str_comms == 'status':   print(Colors.PURPLE,    end="")
             if str_comms == 'error':    print(Colors.RED,       end="")
             if str_comms == "tx":       print(Colors.YELLOW + "<----")
@@ -103,19 +111,6 @@ class StoreHandler(BaseHTTPRequestHandler):
             if str_comms == "tx":       print(Colors.YELLOW + "<----")
             if str_comms == "rx":       print(Colors.GREEN  + "---->")
             print(Colors.NO_COLOUR, end="", flush=True)
-
-    def buffered_response(self, filePath):
-        self.send_response(200)
-        self.end_headers()
-        f = open(filePath, "rb")
-        buf = 16*1024
-        while 1:
-            chunk = f.read(buf)
-            if not chunk:
-                break
-            self.wfile.write(chunk)
-        f.close()
-
 
     def remoteLocation_resolve(self, d_remote):
         """
@@ -143,6 +138,75 @@ class StoreHandler(BaseHTTPRequestHandler):
             'path':     str_remotePath
         }
 
+    def getData(self, **kwargs):
+        raise NotImplementedError('Abstract Method: Please implement this method in child class')
+
+    def writeToBuffer(self, fileToProcess):
+        self.buffered_contents = BytesIO()
+        self.buffered_contents.write(open(fileToProcess, 'rb').read())
+        self.buffered_contents.seek(0)
+        self.send_file = True
+
+    def log_message(self, format, *args):
+        """
+        This silences the server from spewing to stdout!
+        """
+        return
+
+    def get(self):
+        self.final_response = ''
+        isAuthorized, error = self.authorizeRequest()
+        if isAuthorized:
+            self.final_response = self.execute_GET()
+            if self.send_file:
+                self.send_file = False
+                return send_file(self.buffered_contents, attachment_filename='capsule.zip', as_attachment=True)
+            else:
+                return (self.final_response)
+        else:
+            self.final_response = self.denyAuth()
+            return (self.final_response)
+
+    def execute_GET(self):
+        self.path = request.headers.environ["RAW_URI"]
+        d_server            = dict(urllib.parse.parse_qsl(urllib.parse.urlsplit(self.path).query))
+        d_meta              = ast.literal_eval(d_server['meta'])
+
+        d_msg               = {
+                                'action':   d_server['action'],
+                                'meta':     d_meta
+                            }
+        d_transport         = d_meta['transport']
+
+        self.dp.qprint(self.path, comms = 'rx')
+
+        if 'checkRemote'    in d_transport and d_transport['checkRemote']:
+            self.dp.qprint('Getting status on server filesystem...', comms = 'status')
+            d_ret = self.do_GET_remoteStatus(d_msg)
+            return d_ret
+
+        if 'compress'       in d_transport:
+            d_ret = self.do_GET_withCompression(d_msg)
+            return d_ret
+
+        if 'copy'           in d_transport :
+            if Gd_internalvar['b_swiftStorage']:
+                d_ret = self.do_GET_withCompression(d_msg)
+                return d_ret
+            else:
+                d_ret = self.do_GET_withCopy(d_msg)
+                return d_ret
+
+    def denyAuth(self):
+        d_ret = {
+                "message": "Unauthorized Client Request",
+		"error": 401,
+                "status": False
+                }
+
+        self.dp.qprint(d_ret, comms = 'tx')
+        return d_ret
+
     def do_GET_remoteStatus(self, d_msg, **kwargs):
         """
         This method is used to get information about the remote
@@ -151,45 +215,41 @@ class StoreHandler(BaseHTTPRequestHandler):
 
         global Gd_internalvar
 
-        d_meta              = d_msg['meta']
-        d_remote            = d_meta['remote']
+        d_meta = d_msg['meta']
+        d_remote = d_meta['remote']
 
-        str_serverPath      = self.remoteLocation_resolve(d_remote)['path']
-        self.dp.qprint('server path resolves to %s' % str_serverPath, comms = 'status')
+        str_serverPath = self.remoteLocation_resolve(d_remote)['path']
+        self.dp.qprint('server path resolves to %s' % str_serverPath, comms='status')
 
-        b_isFile            = os.path.isfile(str_serverPath)
-        b_isDir             = os.path.isdir(str_serverPath)
-        b_exists            = os.path.exists(str_serverPath)
-        
-        self.dp.qprint('b_isfile:  %r' % b_isFile, comms = 'status')
-        self.dp.qprint('b_isDir:   %r' % b_isDir,  comms = 'status')
-        self.dp.qprint('b_exists:  %r' % b_exists, comms = 'status')
+        b_isFile = os.path.isfile(str_serverPath)
+        b_isDir = os.path.isdir(str_serverPath)
+        b_exists = os.path.exists(str_serverPath)
 
-        b_createdNewDir     = False
-        b_swiftStore        = False
-        
+        self.dp.qprint('b_isfile:  %r' % b_isFile, comms='status')
+        self.dp.qprint('b_isDir:   %r' % b_isDir, comms='status')
+        self.dp.qprint('b_exists:  %r' % b_exists, comms='status')
+
+        b_createdNewDir = False
+        b_swiftStore = False
+
         if Gd_internalvar['b_swiftStorage']:
-            b_exists     = True
-            b_swiftStore = True 
+            b_exists = True
+            b_swiftStore = True
 
         if not b_exists and Gd_internalvar['createDirsAsNeeded']:
             os.makedirs(str_serverPath)
             b_createdNewDir = True
+            b_createdNewDir = True
 
-        d_ret               = {
-            'status':           b_exists or b_createdNewDir,
-            'isfile':           b_isFile,
-            'isswiftstore':     b_swiftStore,
-            'isdir':            b_isDir,
-            'createdNewDir':    b_createdNewDir
+        d_ret = {
+            'status': b_exists or b_createdNewDir,
+            'isfile': b_isFile,
+            'isswiftstore': b_swiftStore,
+            'isdir': b_isDir,
+            'createdNewDir': b_createdNewDir
         }
 
-        self.send_response(200)
-        self.end_headers()
-
-        self.ret_client(d_ret)
-        self.dp.qprint(d_ret, comms = 'tx')
-
+        self.dp.qprint(d_ret, comms='tx')
         return {'status': b_exists or b_createdNewDir}
 
     def do_GET_withCompression(self, d_msg):
@@ -206,6 +266,7 @@ class StoreHandler(BaseHTTPRequestHandler):
         d_ret               = {}
 
         str_serverPath      = self.remoteLocation_resolve(d_remote)['path']
+
         d_ret['preop']      = self.do_GET_preop(    meta          = d_meta,
                                                     path          = str_serverPath)
         if d_ret['preop']['status']:
@@ -222,25 +283,65 @@ class StoreHandler(BaseHTTPRequestHandler):
         if os.path.isdir(str_serverPath):   b_zip   = True
 
         # pudb.set_trace()
-        # The 'key' is an IMPLICIT parameter used by CUBE. 
+        # The 'key' is an IMPLICIT parameter used by CUBE.
         if 'key' not in d_remote:
             d_remote['key'] = '%s' % uuid.uuid4()
 
         d_ret = self.getData(
-                                path        = str_fileToProcess, 
+                                path        = str_fileToProcess,
                                 is_zip      = b_zip,
-                                cleanup     = b_cleanup, 
+                                cleanup     = b_cleanup,
                                 key         = d_remote['key'],
                                 d_ret       = d_ret
                             )
-        d_ret['postop']      = self.do_GET_postop(  meta          = d_meta)
-        self.ret_client(d_ret)
-        self.dp.qprint(json.dumps(d_ret, indent = 4), comms = 'tx')
 
+        d_ret['postop']      = self.do_GET_postop(  meta          = d_meta)
+        self.dp.qprint(json.dumps(d_ret, indent = 4), comms = 'tx')
         return d_ret
 
-    def getData(self, **kwargs):
-        raise NotImplementedError('Abstract Method: Please implement this method in child class')
+    def do_GET_preop(self, **kwargs):
+        """
+        Perform any pre-operations relating to a "PULL" or "GET" request.
+
+        Essentially, for the 'plugin' case, this means appending a string
+        'outgoing' to the remote storage location path and create that dir!
+
+        """
+
+        d_meta          = {}
+        d_postop        = {}
+        d_ret           = {}
+        b_status        = False
+        str_path        = ''
+        b_openshift     = False
+
+        for k,v in kwargs.items():
+            if k == 'meta':         d_meta          = v
+            if k == 'path':         str_path        = v
+
+        if 'serviceMan' in d_meta.keys():
+            b_openshift = d_meta['serviceMan'] == 'openshift'
+
+        if 'specialHandling' in d_meta and not b_openshift:
+            d_preop = d_meta['specialHandling']
+            if 'cmd' in d_preop.keys():
+                str_cmd     = d_postop['cmd']
+                str_keyPath = ''
+                if 'remote' in d_meta.keys():
+                    str_keyPath = self.remoteLocation_resolve(d_meta['remote'])['path']
+                str_cmd     = str_cmd.replace('%key', str_keyPath)
+                b_status    = True
+                d_ret['cmd']    = str_cmd
+            if 'op' in d_preop.keys():
+                if d_preop['op']   == 'plugin':
+                    str_outgoingPath        = '%s/outgoing' % str_path
+                    d_ret['op']             = 'plugin'
+                    d_ret['outgoingPath']   = str_outgoingPath
+                    b_status                = True
+
+        d_ret['status']     = b_status
+        d_ret['timestamp']  = '%s' % datetime.datetime.now()
+        return d_ret
 
     def do_GET_withCopy(self, d_msg):
         """
@@ -261,6 +362,7 @@ class StoreHandler(BaseHTTPRequestHandler):
 
         b_copyTree          = False
         b_copyFile          = False
+        b_symlink           = False
         b_symlink           = False
 
         d_ret               = {'status': True}
@@ -294,95 +396,7 @@ class StoreHandler(BaseHTTPRequestHandler):
         d_ret['symlink']        = b_symlink
         d_ret['timestamp']      = '%s' % datetime.datetime.now()
 
-        self.ret_client(d_ret)
-
         return d_ret
-
-    def log_message(self, format, *args):
-        """
-        This silences the server from spewing to stdout!
-        """
-        return
-
-    def do_GET(self):
-        isAuthorized, error = self.authorizeRequest()
-        if isAuthorized:
-            return self.execute_GET()
-        else:
-            self.denyAuth()
-
-
-    def authorizeRequest(self):
-        # Authenticate user request if the server is started with the __b_tokenAuth private flag set to true
-        if self.__b_tokenAuth:
-            print('Authorizing client request...')
-            isAuthorized, error = self.__auth.authorizeClientRequest(self.headers)
-            if isAuthorized:
-                return (True, "")
-            else:
-                code, msg, explain = error
-                self.send_response(code, msg)
-                return (False, "%s %s %s" % (code, msg, explain))
-
-        # If not configured to authorize requests, allow all requests through
-        else:
-            return (True, "")
-
-    def denyAuth(self):
-        d_ret = {
-                "message": "Unauthorized Client Request",
-                'status': False
-                }
-
-        self.send_error(401)
-        self.end_headers()
-
-        self.ret_client(d_ret)
-        self.dp.qprint(d_ret, comms = 'tx')
-        return d_ret
-
-    def execute_GET(self):
-        d_server            = dict(urllib.parse.parse_qsl(urllib.parse.urlsplit(self.path).query))
-        d_meta              = ast.literal_eval(d_server['meta'])
-
-        d_msg               = {
-                                'action':   d_server['action'],
-                                'meta':     d_meta
-                            }
-        d_transport         = d_meta['transport']
-
-        self.dp.qprint(self.path, comms = 'rx')
-
-        if 'checkRemote'    in d_transport and d_transport['checkRemote']:
-            self.dp.qprint('Getting status on server filesystem...', comms = 'status')
-            d_ret = self.do_GET_remoteStatus(d_msg)
-            return d_ret
-
-        if 'compress'       in d_transport:
-            d_ret = self.do_GET_withCompression(d_msg)
-            return d_ret
-
-        if 'copy'           in d_transport :
-            if Gd_internalvar['b_swiftStorage']:
-                d_ret = self.do_GET_withCompression(d_msg)
-                return d_ret               
-            else:
-                d_ret = self.do_GET_withCopy(d_msg)
-                return d_ret
-
-    def form_get(self, str_verb):
-        """
-        Returns a form from cgi.FieldStorage
-        """
-        return cgi.FieldStorage(
-            fp = self.rfile,
-            headers = self.headers,
-            environ =
-            {
-                'REQUEST_METHOD':   str_verb,
-                'CONTENT_TYPE':     self.headers['Content-Type'],
-            }
-        )
 
     def storage_resolveBasedOnKey(self, *args, **kwargs):
         """
@@ -498,7 +512,7 @@ class StoreHandler(BaseHTTPRequestHandler):
         if d_request:
             d_meta  = d_request['meta']
             d_ret   = self.internalctl_varprocess(d_meta = d_meta)
-        return d_ret
+        return (d_ret)
 
     def hello_process(self, *args, **kwargs):
         """
@@ -516,52 +530,52 @@ class StoreHandler(BaseHTTPRequestHandler):
         """
 
         global Gd_internalvar
-        self.dp.qprint("hello_process()", comms = 'status')
-        b_status            = False
-        d_ret               = {}
-        d_request           = {}
+        self.dp.qprint("hello_process()", comms='status')
+        b_status = False
+        d_ret = {}
+        d_request = {}
         for k, v in kwargs.items():
-            if k == 'request':      d_request   = v
+            if k == 'request':      d_request = v
 
-        d_meta  = d_request['meta']
+        d_meta = d_request['meta']
         if 'askAbout' in d_meta.keys():
-            str_askAbout        = d_meta['askAbout']
-            d_ret['name']       = Gd_internalvar['name']
-            d_ret['version']    = Gd_internalvar['version']
+            str_askAbout = d_meta['askAbout']
+            d_ret['name'] = Gd_internalvar['name']
+            d_ret['version'] = Gd_internalvar['version']
             if str_askAbout == 'timestamp':
-                str_timeStamp   = datetime.datetime.today().strftime('%Y%m%d%H%M%S.%f')
-                d_ret['timestamp']              = {}
-                d_ret['timestamp']['now']       = str_timeStamp
-                b_status                        = True
+                str_timeStamp = datetime.datetime.today().strftime('%Y%m%d%H%M%S.%f')
+                d_ret['timestamp'] = {}
+                d_ret['timestamp']['now'] = str_timeStamp
+                b_status = True
             if str_askAbout == 'sysinfo':
-                d_ret['sysinfo']                = {}
-                d_ret['sysinfo']['system']      = platform.system()
-                d_ret['sysinfo']['machine']     = platform.machine()
-                d_ret['sysinfo']['platform']    = platform.platform()
-                d_ret['sysinfo']['uname']       = platform.uname()
-                d_ret['sysinfo']['version']     = platform.version()
-                d_ret['sysinfo']['memory']      = psutil.virtual_memory()
-                d_ret['sysinfo']['cpucount']    = multiprocessing.cpu_count()
-                d_ret['sysinfo']['loadavg']     = os.getloadavg()
+                d_ret['sysinfo'] = {}
+                d_ret['sysinfo']['system'] = platform.system()
+                d_ret['sysinfo']['machine'] = platform.machine()
+                d_ret['sysinfo']['platform'] = platform.platform()
+                d_ret['sysinfo']['uname'] = platform.uname()
+                d_ret['sysinfo']['version'] = platform.version()
+                d_ret['sysinfo']['memory'] = psutil.virtual_memory()
+                d_ret['sysinfo']['cpucount'] = multiprocessing.cpu_count()
+                d_ret['sysinfo']['loadavg'] = os.getloadavg()
                 d_ret['sysinfo']['cpu_percent'] = psutil.cpu_percent()
-                d_ret['sysinfo']['hostname']    = socket.gethostname()
-                d_ret['sysinfo']['inet']        = [l for l in ([ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")][:1], [[(s.connect(('8.8.8.8', 53)), s.getsockname()[0], s.close()) for s in [socket.socket(socket.AF_INET, socket.SOCK_DGRAM)]][0][1]]) if l][0][0]
-                b_status                        = True
+                d_ret['sysinfo']['hostname'] = socket.gethostname()
+                d_ret['sysinfo']['inet'] = [l for l in (
+                [ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")][:1], [
+                    [(s.connect(('8.8.8.8', 53)), s.getsockname()[0], s.close()) for s in
+                     [socket.socket(socket.AF_INET, socket.SOCK_DGRAM)]][0][1]]) if l][0][0]
+                b_status = True
             if str_askAbout == 'echoBack':
-                d_ret['echoBack']               = {}
-                d_ret['echoBack']['msg']        = d_meta['echoBack']
-                b_status                        = True
-        
-        self.send_response(200)
-        self.end_headers()
+                d_ret['echoBack'] = {}
+                d_ret['echoBack']['msg'] = d_meta['echoBack']
+                b_status = True
 
-        d_ret['User-agent'] = self.headers['user-agent']
+        d_ret['User-agent'] = request.headers['user-agent']
 
-        return { 'stdout': { 
-                            'd_ret':   d_ret,
-                            'status':  b_status
-                            }
+        return ({'stdout': {
+            'd_ret': d_ret,
+            'status': b_status
         }
+        })
 
     def rmtree_process(self, **kwargs):
         """
@@ -569,55 +583,73 @@ class StoreHandler(BaseHTTPRequestHandler):
         with a "path" or indirectly with a "key".
 
         """
-        str_path    = ''
-        str_msg     = ''
-        b_status    = False
-        d_msg       = {}
-        d_ret       = {}
-        for k,v in kwargs.items():
-            if k == 'request':  d_msg   = v
+        str_path = ''
+        str_msg = ''
+        b_status = False
+        d_msg = {}
+        d_ret = {}
+        for k, v in kwargs.items():
+            if k == 'request':  d_msg = v
 
-        d_meta      = d_msg['meta']
-        str_path    = self.remoteLocation_resolve(d_meta)['path']
+        d_meta = d_msg['meta']
+        str_path = self.remoteLocation_resolve(d_meta)['path']
         if len(str_path):
             # str_path    = d_meta['path']
             self.dp.qprint('Will rmtree <%s>; UID %s, eUID %s...' % (str_path, os.getuid(), os.getegid()))
             try:
                 shutil.rmtree(str_path)
-                b_status    = True
-                str_msg     = 'Successfully removed tree %s' % str_path
-                self.dp.qprint(str_msg, comms = 'status')
+                b_status = True
+                str_msg = 'Successfully removed tree %s' % str_path
+                self.dp.qprint(str_msg, comms='status')
             except:
-                b_status    = False
-                str_msg     = 'Could not remove tree %s. Possible permission error or invalid path. Try using action `ls`' % str_path
-                self.dp.qprint(str_msg, comms = 'error')
-        d_ret   = {
-            'status':   b_status,
-            'msg':      str_msg
+                b_status = False
+                str_msg = 'Could not remove tree %s. Possible permission error or invalid path. Try using action `ls`' % str_path
+                self.dp.qprint(str_msg, comms='error')
+        d_ret = {
+            'status': b_status,
+            'msg': str_msg
         }
 
-        return d_ret
+        return (d_ret)
+
+    def ls_do(self, **kwargs):
+        """
+        Perform an ls based on the passed args.
+        """
+        for k,v in kwargs.items():
+            if k == 'meta':         d_meta          = v
+
+        if 'remote' in d_meta.keys():
+            d_remote = d_meta['remote']
+            for subdir in ['incoming', 'outgoing']:
+                d_remote['subdir']  = subdir
+                dmsg_lstree = {
+                                'action': 'rmtree',
+                                'meta'  :  d_remote
+                                }
+                d_ls                    = self.ls_process(    request = dmsg_lstree)
+                self.dp.qprint("target ls = \n%s" % self.pp.pformat(d_ls).strip())
 
     def ls_process(self, **kwargs):
         """
-        Return a list of dictionary entries of directory entries of 
+        Return a list of dictionary entries of directory entries of
         path or key store.
         """
 
-        str_path    = ''
-        str_msg     = ''
-        b_status    = False
-        d_msg       = {}
-        d_ret       = {}
-        d_e         = {}
-        d_ls        = {}
-        for k,v in kwargs.items():
-            if k == 'request':  d_msg   = v
+        str_path = ''
+        str_msg = ''
+        b_status = False
+        d_msg = {}
+        d_ret = {}
+        d_e = {}
+        d_ls = {}
+        for k, v in kwargs.items():
+            if k == 'request':  d_msg = v
 
-        d_meta      = d_msg['meta']
-        str_path    = self.remoteLocation_resolve(d_meta)['path']
+        d_meta = d_msg['meta']
+        str_path = self.remoteLocation_resolve(d_meta)['path']
         if 'subdir' in d_meta.keys():
-            str_path    = os.path.join(str_path, d_meta['subdir'])
+            str_path = os.path.join(str_path, d_meta['subdir'])
         if len(str_path):
             self.dp.qprint('scandir on  %s...' % str_path)
             try:
@@ -627,45 +659,38 @@ class StoreHandler(BaseHTTPRequestHandler):
                     if e.is_dir():      str_type = 'dir'
                     if e.is_symlink():  str_type = 'symlink'
                     d_e = {
-                        'type':     str_type,
-                        'path':     os.path.join(str_path, e.name),
-                        'uid':      e.stat().st_uid,
-                        'gid':      e.stat().st_gid,
-                        'size':     e.stat().st_size,
-                        'mtime':    e.stat().st_mtime,
-                        'ctime':    e.stat().st_ctime,
-                        'atime':    e.stat().st_atime
+                        'type': str_type,
+                        'path': os.path.join(str_path, e.name),
+                        'uid': e.stat().st_uid,
+                        'gid': e.stat().st_gid,
+                        'size': e.stat().st_size,
+                        'mtime': e.stat().st_mtime,
+                        'ctime': e.stat().st_ctime,
+                        'atime': e.stat().st_atime
                     }
-                    d_ls[e.name]   = d_e
-                b_status    = True
-                str_msg     = 'Successful scandir on %s' % str_path
-                self.dp.qprint(str_msg, comms = 'status')
+                    d_ls[e.name] = d_e
+                b_status = True
+                str_msg = 'Successful scandir on %s' % str_path
+                self.dp.qprint(str_msg, comms='status')
             except:
-                b_status    = False
-                str_msg     = 'Could not scandir >%s<. Possible permission error.' % str_path
-                self.dp.qprint(str_msg, comms = 'error')
-        d_ret   = {
-            'status':   b_status,
-            'msg':      str_msg,
-            'd_ls':     d_ls
+                b_status = False
+                str_msg = 'Could not scandir >%s<. Possible permission error.' % str_path
+                self.dp.qprint(str_msg, comms='error')
+        d_ret = {
+            'status': b_status,
+            'msg': str_msg,
+            'd_ls': d_ls
         }
 
-        return d_ret
-    
+        return (d_ret)
+
     def getContentLength(self):
         """
         Return headers of the request
         """
-        
-        # self.dp.qprint('http headers received = \n%s' % self.headers, comms = 'status')
-        return int(self.headers['content-length'])
 
-    def rfileRead(self, length):
-        """
-        Return the contents of the file transmitted
-        """
-
-        return self.rfile.read(int(length))
+        # self.dp.qprint('http headers received = \n%s' % request.headers, comms = 'status')
+        return int(request.headers['content-length'])
 
     def unpackForm(self, form, d_form):
         """
@@ -709,12 +734,83 @@ class StoreHandler(BaseHTTPRequestHandler):
 
         return d_msg
 
-    def do_POST(self, **kwargs):
+    def post(self, **kwargs):
+        self.final_response = ''
         isAuthorized, error = self.authorizeRequest()
         if isAuthorized:
-            return self.execute_POST(**kwargs)
+            self.final_response = self.execute_POST(**kwargs)
+            return (self.final_response)
         else:
-            self.denyAuth()
+            self.final_response = self.denyAuth()
+            return (self.final_response)
+
+    def authorizeRequest(self):
+        # Authenticate user request if the server is started with the __b_tokenAuth private flag set to true
+        if self.__b_tokenAuth:
+            print('Authorizing client request...')
+            requestAuth_headers = request.headers.get('Authorization')
+
+            authToken = requestAuth_headers.split()[-1]
+            correct_token = Gd_internalvar['authModule']
+            if authToken == correct_token:
+                return (True, "")
+            else:
+                return (False, "Auth Token is not Valid")
+
+        # If not configured to authorize requests, allow all requests through
+        else:
+            return (True, "")
+
+    def execute_POST(self, **kwargs):
+        """
+        The main logic for processing POST directives from the client.
+
+        This method will extract both meta (i.e. control-mode)
+        as well as payload (i.e. data-mode or form-mode)
+        directives .
+        """
+
+        b_skipInit = False
+        d_msg = {
+            'status': False
+        }
+        d_postParse = {
+            'status': False
+        }
+
+        for k, v in kwargs.items():
+            if k == 'd_msg':
+                d_msg = v
+                b_skipInit = True
+
+        if not b_skipInit:
+            d_postParse = self.do_POST_dataParse()
+            try:
+                d_msg = d_postParse['d_data']
+            except:
+                d_msg['errorMessage'] = "No 'd_data' in postParse."
+
+        self.dp.qprint('d_msg = \n%s' %
+                       json.dumps(
+                           d_msg, indent=4
+                       ), comms='status')
+
+        if d_postParse['status']:
+            d_meta = d_msg['meta']
+
+            if 'action' in d_msg and 'transport' not in d_meta:
+                d_ret = self.do_POST_actionParse(d_msg)
+
+            if 'ctl' in d_meta:
+                d_ret = self.do_POST_serverctl(d_meta)
+
+            if 'transport' in d_meta:
+                d_ret = self.do_POST_transportParse(d_meta, d_postParse)
+
+            #if not b_skipInit: self.ret_client(d_ret)
+        else:
+            d_ret = d_msg
+        return d_ret
 
     def do_POST_dataParse(self):
         """
@@ -730,31 +826,41 @@ class StoreHandler(BaseHTTPRequestHandler):
             'd_form':       {}
         }
 
-        self.dp.qprint("Headers received = \n" + str(self.headers), 
+        self.dp.qprint("Headers received = \n" + str(request.headers),
                         comms = 'rx')
 
-        if 'Mode' in self.headers:
-            if self.headers['mode'] != 'control':
+        if 'Mode' in request.headers:
+            if request.headers['mode'] != 'control':
                 b_fileStream    = True
                 d_ret['mode']   = 'form'
             else:
-                d_ret['mode']   = 'control'   
+                d_ret['mode']   = 'control'
         if b_fileStream:
             form                = self.form_get('POST')
             if len(form):
-                d_ret['form']   = form 
+                d_ret['form']   = form
                 d_ret['d_data'] = self.unpackForm(form, d_ret['d_form'])
                 d_ret['status'] = d_ret['d_data']['status']
         else:
             self.dp.qprint("Parsing JSON data...", comms = 'status')
             length          = self.getContentLength()
-            d_post          = json.loads(self.rfile.read(length).decode())
+            json_content = [*json.loads(json.dumps(request.values.to_dict(flat=False)))][0]
+            d_post          = json.loads(json_content)
             try:
                 d_ret['d_data'] = d_post['payload']
             except:
                 d_ret['d_data'] = d_post
 
         return d_ret
+
+    def form_get(self, str_verb):
+        """
+        Returns a form from cgi.FieldStorage
+        """
+        return cgi.FieldStorage(
+            fp = request.environ['wsgi.input'],
+            environ = request.environ
+        )
 
     def do_POST_actionParse(self, d_msg):
         """
@@ -769,28 +875,28 @@ class StoreHandler(BaseHTTPRequestHandler):
         # might return a different dictionary. It is NOT safe to
         # assume that all action processing methods will honor this
         # tempate.
-        d_actionResult      = {
-            'status':       True,
-            'msg':          ''
+        d_actionResult = {
+            'status': True,
+            'msg': ''
         }
 
-        self.dp.qprint("verb: %s detected." % d_msg['action'], comms = 'status')
-        str_method      = '%s_process' % d_msg['action']
-        self.dp.qprint("method to call: %s(request = d_msg) " % str_method, comms = 'status')
+        self.dp.qprint("verb: %s detected." % d_msg['action'], comms='status')
+        str_method = '%s_process' % d_msg['action']
+        self.dp.qprint("method to call: %s(request = d_msg) " % str_method, comms='status')
         try:
-            method              = getattr(self, str_method)
-            d_actionResult      = method(request = d_msg)
+            method = getattr(self, str_method)
+            d_actionResult = method(request=d_msg)
         except:
-            str_msg     = "Class '{}' does not implement method '{}'".format(
-                                    self.__class__.__name__, 
-                                    str_method)
-            d_actionResult      = {
-                'status':   False,
-                'msg':      str_msg
+            str_msg = "Class '{}' does not implement method '{}'".format(
+                self.__class__.__name__,
+                str_method)
+            d_actionResult = {
+                'status': False,
+                'msg': str_msg
             }
-            self.dp.qprint(str_msg, comms = 'error')
-        self.dp.qprint(json.dumps(d_actionResult, indent = 4), comms = 'tx')
-        
+            self.dp.qprint(str_msg, comms='error')
+        self.dp.qprint(json.dumps(d_actionResult, indent=4), comms='tx')
+
         return d_actionResult
 
     def do_POST_transportParse(self, d_meta, d_postParse):
@@ -811,7 +917,7 @@ class StoreHandler(BaseHTTPRequestHandler):
             d_ret       = self.do_POST_withCompression(
                 length  = length,
                 form    = d_postParse['form'],
-                d_form  = d_postParse['d_form'] 
+                d_form  = d_postParse['d_form']
             )
         if 'copy' in d_transport :
             if Gd_internalvar['b_swiftStorage']:
@@ -822,79 +928,6 @@ class StoreHandler(BaseHTTPRequestHandler):
                 )
             else:
                 d_ret   = self.do_POST_withCopy(d_meta)
-        return d_ret
-
-    def execute_POST(self, **kwargs):
-        """
-        The main logic for processing POST directives from the client.
-
-        This method will extract both meta (i.e. control-mode)
-        as well as payload (i.e. data-mode or form-mode)
-        directives .
-        """
-
-        b_skipInit  = False
-        d_msg       = {
-            'status':   False
-        }
-        d_postParse = {
-            'status':   False
-        }
-
-        for k,v in kwargs.items():
-            if k == 'd_msg':
-                d_msg       = v
-                b_skipInit  = True
-        
-        if not b_skipInit: 
-            d_postParse     = self.do_POST_dataParse()
-            try:
-                d_msg                   = d_postParse['d_data']
-            except:
-                d_msg['errorMessage']   = "No 'd_data' in postParse."
-
-        self.dp.qprint('d_msg = \n%s' % 
-                        json.dumps(
-                            d_msg, indent = 4
-                        ), comms = 'status')
-
-        if d_postParse['status']:
-            d_meta      = d_msg['meta']
-
-            if 'action' in d_msg and 'transport' not in d_meta:  
-                d_ret   = self.do_POST_actionParse(d_msg)
-
-            if 'ctl' in d_meta:
-                d_ret   = self.do_POST_serverctl(d_meta)
-
-            if 'transport' in d_meta:
-                d_ret   = self.do_POST_transportParse(d_meta, d_postParse)
-
-            if not b_skipInit: self.ret_client(d_ret)
-        else:
-            d_ret       = d_msg
-        return d_ret
-
-    def do_POST_serverctl(self, d_meta):
-        """
-        """
-        d_ctl   = d_meta['ctl']
-        d_ret   = {
-            'status':   True,
-            'msg':      ''
-        }
-        self.dp.qprint('Processing server ctl...', comms = 'status')
-        self.dp.qprint(d_meta, comms = 'rx')
-        if 'serverCmd' in d_ctl:
-            if d_ctl['serverCmd'] == 'quit':
-                self.dp.qprint('Shutting down server', comms = 'status')
-                d_ret = {
-                    'msg':      'Server shut down',
-                    'status':   True
-                }
-                self.dp.qprint(d_ret, comms = 'tx')
-                self.ret_client(d_ret)
-                os._exit(0)
         return d_ret
 
     def do_POST_withCopy(self, d_meta):
@@ -952,67 +985,27 @@ class StoreHandler(BaseHTTPRequestHandler):
 
         return d_ret
 
-    def do_GET_preop(self, **kwargs):
+
+    def do_POST_serverctl(self, d_meta):
         """
-        Perform any pre-operations relating to a "PULL" or "GET" request.
-
-        Essentially, for the 'plugin' case, this means appending a string
-        'outgoing' to the remote storage location path and create that dir!
-
         """
-
-        d_meta          = {}
-        d_postop        = {}
-        d_ret           = {}
-        b_status        = False
-        str_path        = ''
-        b_openshift     = False
-
-        for k,v in kwargs.items():
-            if k == 'meta':         d_meta          = v
-            if k == 'path':         str_path        = v
-
-        if 'serviceMan' in d_meta.keys():
-            b_openshift = d_meta['serviceMan'] == 'openshift'
-
-        if 'specialHandling' in d_meta and not b_openshift:
-            d_preop = d_meta['specialHandling']
-            if 'cmd' in d_preop.keys():
-                str_cmd     = d_postop['cmd']
-                str_keyPath = ''
-                if 'remote' in d_meta.keys():
-                    str_keyPath = self.remoteLocation_resolve(d_meta['remote'])['path']
-                str_cmd     = str_cmd.replace('%key', str_keyPath)
-                b_status    = True
-                d_ret['cmd']    = str_cmd
-            if 'op' in d_preop.keys():
-                if d_preop['op']   == 'plugin':
-                    str_outgoingPath        = '%s/outgoing' % str_path
-                    d_ret['op']             = 'plugin'
-                    d_ret['outgoingPath']   = str_outgoingPath
-                    b_status                = True
-
-        d_ret['status']     = b_status
-        d_ret['timestamp']  = '%s' % datetime.datetime.now()
-        return d_ret
-
-    def ls_do(self, **kwargs):
-        """
-        Perform an ls based on the passed args.
-        """
-        for k,v in kwargs.items():
-            if k == 'meta':         d_meta          = v
-
-        if 'remote' in d_meta.keys():
-            d_remote = d_meta['remote']
-            for subdir in ['incoming', 'outgoing']:
-                d_remote['subdir']  = subdir                    
-                dmsg_lstree = { 
-                                'action': 'rmtree',
-                                'meta'  :  d_remote
-                                }
-                d_ls                    = self.ls_process(    request = dmsg_lstree)
-                self.dp.qprint("target ls = \n%s" % self.pp.pformat(d_ls).strip())
+        d_ctl   = d_meta['ctl']
+        d_ret   = {
+            'status':   True,
+            'msg':      ''
+        }
+        self.dp.qprint('Processing server ctl...', comms = 'status')
+        self.dp.qprint(d_meta, comms = 'rx')
+        if 'serverCmd' in d_ctl:
+            if d_ctl['serverCmd'] == 'quit':
+                self.dp.qprint('Shutting down server', comms = 'status')
+                d_ret = {
+                    'msg':      'Server shut down',
+                    'status':   True
+                }
+                self.dp.qprint(d_ret, comms = 'tx')
+                os._exit(0)
+        return (d_ret)
 
     def do_GET_postop(self, **kwargs):
         """
@@ -1022,16 +1015,16 @@ class StoreHandler(BaseHTTPRequestHandler):
         :return:
         """
 
-        str_cmd         = ''
-        d_meta          = {}
-        d_postop        = {}
-        d_ret           = {}
-        b_status        = False
-        str_path        = ''
-        b_openshift     = False
+        str_cmd = ''
+        d_meta = {}
+        d_postop = {}
+        d_ret = {}
+        b_status = False
+        str_path = ''
+        b_openshift = False
 
-        for k,v in kwargs.items():
-            if k == 'meta':         d_meta          = v
+        for k, v in kwargs.items():
+            if k == 'meta':         d_meta = v
 
         if 'serviceMan' in d_meta.keys():
             b_openshift = d_meta['serviceMan'] == 'openshift'
@@ -1047,21 +1040,22 @@ class StoreHandler(BaseHTTPRequestHandler):
                     #   mkdir $str_path
                     #   mv /tmp/$str_path $str_path/incoming
                     #
+
                     if 'remote' in d_meta.keys():
                         d_remote = d_meta['remote']
-                    self.ls_do(meta = d_meta)
-                    dmsg_rmtree = { 
-                                    'action': 'rmtree',
-                                    'meta'  :  d_remote
-                                    }
-                    self.dp.qprint("Performing GET postop cleanup", comms = 'status')
-                    self.dp.qprint("dmsg_rmtree: %s" % dmsg_rmtree, comms = 'status')
-                    d_ret['rmtree']         = self.rmtree_process(request = dmsg_rmtree)
-                    d_ret['op']             = 'plugin'
-                    b_status                = d_ret['rmtree']['status']
+                    self.ls_do(meta=d_meta)
+                    dmsg_rmtree = {
+                        'action': 'rmtree',
+                        'meta': d_remote
+                    }
+                    self.dp.qprint("Performing GET postop cleanup", comms='status')
+                    self.dp.qprint("dmsg_rmtree: %s" % dmsg_rmtree, comms='status')
+                    d_ret['rmtree'] = self.rmtree_process(request=dmsg_rmtree)
+                    d_ret['op'] = 'plugin'
+                    b_status = d_ret['rmtree']['status']
 
-        d_ret['status']     = b_status
-        d_ret['timestamp']  = '%s' % datetime.datetime.now()
+        d_ret['status'] = b_status
+        d_ret['timestamp'] = '%s' % datetime.datetime.now()
         return d_ret
 
     def do_POST_postop(self, **kwargs):
@@ -1072,45 +1066,45 @@ class StoreHandler(BaseHTTPRequestHandler):
         :return:
         """
 
-        str_cmd         = ''
-        d_meta          = {}
-        d_postop        = {}
-        d_ret           = {}
-        b_status        = False
-        str_path        = ''
-        b_openshift     = False
+        str_cmd = ''
+        d_meta = {}
+        d_postop = {}
+        d_ret = {}
+        b_status = False
+        str_path = ''
+        b_openshift = False
 
-        for k,v in kwargs.items():
-            if k == 'meta':         d_meta          = v
-            if k == 'path':         str_path        = v
+        for k, v in kwargs.items():
+            if k == 'meta':         d_meta = v
+            if k == 'path':         str_path = v
 
         if 'serviceMan' in d_meta.keys():
             b_openshift = d_meta['serviceMan'] == 'openshift'
         if 'specialHandling' in d_meta and not b_openshift:
             d_postop = d_meta['specialHandling']
             if 'cmd' in d_postop.keys():
-                str_cmd     = d_postop['cmd']
+                str_cmd = d_postop['cmd']
                 str_keyPath = ''
                 if 'remote' in d_meta.keys():
                     str_keyPath = self.remoteLocation_resolve(d_meta['remote'])['path']
-                str_cmd     = str_cmd.replace('%key', str_keyPath)
-                b_status    = True
-                d_ret['cmd']    = str_cmd
+                str_cmd = str_cmd.replace('%key', str_keyPath)
+                b_status = True
+                d_ret['cmd'] = str_cmd
             if 'op' in d_postop.keys():
-                if d_postop['op']   == 'plugin':
+                if d_postop['op'] == 'plugin':
                     #
-                    # In this case the contents of the keyStore need to be moved to a 
-                    # directory called 'incoming' within that store. In shell, this 
+                    # In this case the contents of the keyStore need to be moved to a
+                    # directory called 'incoming' within that store. In shell, this
                     # would amount to:
                     #
                     #   mv $str_path /tmp/$str_path
                     #   mkdir $str_path
                     #   mv /tmp/$str_path $str_path/incoming
                     #
-                    str_uuid            = '%s' % uuid.uuid4()
-                    str_tmp             = os.path.join('/tmp', str_uuid)
-                    str_incomingPath    = os.path.join(str_path, 'incoming')
-                    str_outgoingPath    = os.path.join(str_path, 'outgoing')
+                    str_uuid = '%s' % uuid.uuid4()
+                    str_tmp = os.path.join('/tmp', str_uuid)
+                    str_incomingPath = os.path.join(str_path, 'incoming')
+                    str_outgoingPath = os.path.join(str_path, 'outgoing')
                     self.dp.qprint("Moving %s to %s..." % (str_path, str_tmp))
                     shutil.move(str_path, str_tmp)
                     self.dp.qprint("Recreating clean path %s..." % str_path)
@@ -1120,119 +1114,103 @@ class StoreHandler(BaseHTTPRequestHandler):
                     self.dp.qprint("Moving %s to %s" % (str_tmp, str_incomingPath))
                     shutil.move(str_tmp, str_incomingPath)
 
-                    d_ret['op']             = 'plugin'
-                    d_ret['shareDir']       = str_path
-                    d_ret['tmpPath']        = str_tmp
-                    d_ret['incomingPath']   = str_incomingPath
-                    d_ret['outgoingPath']   = str_outgoingPath
+                    d_ret['op'] = 'plugin'
+                    d_ret['shareDir'] = str_path
+                    d_ret['tmpPath'] = str_tmp
+                    d_ret['incomingPath'] = str_incomingPath
+                    d_ret['outgoingPath'] = str_outgoingPath
                     os.makedirs(str_outgoingPath)
                     st = os.stat(str_outgoingPath)
                     os.chmod(str_outgoingPath, stat.S_IRWXO | stat.S_IRWXG | stat.S_IRWXU)
-                    b_status                = True
+                    b_status = True
 
-        d_ret['status']     = b_status
-        d_ret['timestamp']  = '%s' % datetime.datetime.now()
+        d_ret['status'] = b_status
+        d_ret['timestamp'] = '%s' % datetime.datetime.now()
         return d_ret
+
+    def _createSwiftService(self, configPath):
+        raise NotImplementedError('Abstract Method: Please implement this method in child class')
 
     def do_POST_withCompression(self, **kwargs):
 
         # Unpack the file stream that has been transmitted in
         # the POSTED form data.
 
-        self.dp.qprint(str(self.headers),              comms = 'rx')
-        self.dp.qprint('do_POST_withCompression()',    comms = 'status')
+        self.dp.qprint(str(dict(request.headers)), comms='rx')
+        self.dp.qprint('do_POST_withCompression()', comms='status')
 
-        d_form              = {}
-        d_ret               = {}
-        d_ret['write']      = {}
+        d_form = {}
+        d_ret = {}
+        d_ret['write'] = {}
 
-        for k,v in kwargs.items():
-            if k == 'd_form':   d_form  = v
+        for k, v in kwargs.items():
+            if k == 'd_form':   d_form = v
 
-        d_msg               = json.loads((d_form['d_msg']))
-        d_meta              = d_msg['meta']
-        inputStream         = d_form['local']
-        str_fileName        = d_meta['local']['path']
-        d_remote            = d_meta['remote']
-        b_unpack            = False
-        str_unpackPath      = self.remoteLocation_resolve(d_remote)['path']
-        d_transport         = d_meta['transport']
-        d_compress          = d_transport['compress']
+        d_msg = json.loads((d_form['d_msg']))
+        d_meta = d_msg['meta']
+        inputStream = d_form['local']
+        str_fileName = d_meta['local']['path']
+        d_remote = d_meta['remote']
+        b_unpack = False
+        str_unpackPath = self.remoteLocation_resolve(d_remote)['path']
+        d_transport = d_meta['transport']
+        d_compress = d_transport['compress']
 
         if 'unpack' in d_compress:
-            b_unpack        = d_compress['unpack']
-        b_zip               = b_unpack and (d_compress['archive'] == 'zip')
+            b_unpack = d_compress['unpack']
+        b_zip = b_unpack and (d_compress['archive'] == 'zip')
 
-        # The 'key' is an IMPLICIT parameter used by CUBE. 
+        # The 'key' is an IMPLICIT parameter used by CUBE.
         if 'key' not in d_remote:
             d_remote['key'] = d_form['filename']
 
         d_ret = self.storeData(
-            client_path     = str_fileName,
-            input_stream    = inputStream,
-            path            = str_unpackPath,
-            is_zip          = b_zip,
-            key             = d_remote['key'],
-            d_ret           = d_ret)
-        
+            client_path=str_fileName,
+            input_stream=inputStream,
+            path=str_unpackPath,
+            is_zip=b_zip,
+            key=d_remote['key'],
+            d_ret=d_ret)
+
         d_ret['postop'] = self.do_POST_postop(
-            meta          = d_meta,
-            path          = str_unpackPath
+            meta=d_meta,
+            path=str_unpackPath
         )
 
-        self.send_response(200)
-        self.end_headers()
-
-        d_ret['User-agent'] = self.headers['user-agent']
+        d_ret['User-agent'] = (request.headers)['user-agent']
 
         # self.ret_client(d_ret)
-        self.dp.qprint(self.pp.pformat(d_ret).strip(), comms = 'tx')
+        self.dp.qprint(self.pp.pformat(d_ret).strip(), comms='tx')
 
         return d_ret
 
     def storeData(self, **kwargs):
         raise NotImplementedError('Abstract Method: Please implement this method in child class')
 
-    def ret_client(self, d_ret):
-        """
-        Simply "writes" the d_ret using json and the client wfile.
 
-        :param d_ret:
-        :return:
-        """
-        global Gd_internalvar
-        if not Gd_internalvar['httpResponse']:
-            self.wfile.write(json.dumps(d_ret).encode())
-        else:
-            self.wfile.write(str(Response(json.dumps(d_ret))).encode())
-
-
-class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
+class SetupFlaskServer():
     """
     Handle requests in a separate thread.
     """
 
     def col2_print(self, str_left, str_right, level = 1):
         self.dp.qprint(Colors.WHITE +
-              ('%*s' % (self.LC, str_left)), 
-              end       = '', 
+              ('%*s' % (self.LC, str_left)),
+              end       = '',
               level     = level,
               syslog    = False)
         self.dp.qprint(Colors.LIGHT_BLUE +
-              ('%*s' % (self.RC, str_right)) + Colors.NO_COLOUR, 
+              ('%*s' % (self.RC, str_right)) + Colors.NO_COLOUR,
               level     = level,
               syslog    = False)
 
     def __init__(self, *args, **kwargs):
         """
-
         Holder for constructor of class -- allows for explicit setting
         of member 'self' variables.
-
         :return:
         """
 
-        HTTPServer.__init__(self, *args, **kwargs)
         self.LC                                 = 40
         self.RC                                 = 40
         self.args                               = None
@@ -1278,10 +1256,13 @@ class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
         self.dp.qprint(self.str_desc)
         if self.args['b_tokenAuth']:
             Gd_internalvar['b_tokenAuth'] = True
+            self.config = configparser.ConfigParser()
             if self.args['str_tokenPath'] != '':
-                Gd_internalvar['authModule']        = Auth('http', self.args['str_tokenPath'])
+                self.config.read(self.args['str_tokenPath'])
             else:
-                Gd_internalvar['authModule']        = Auth('http', 'pfioh_config.cfg')
+                self.config.read("pfioh_config.cfg")
+            AUTH_TOKEN = str(self.config.get('AUTH TOKENS', 'token'))
+            Gd_internalvar['authModule']        = AUTH_TOKEN
 
         self.col2_print("Listening on address:",    self.args['ip'])
         self.col2_print("Listening on port:",       self.args['port'])
@@ -1290,13 +1271,12 @@ class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
         self.col2_print("Authorization enabled:",   self.args['b_tokenAuth'])
 
         self.dp.qprint(
-                Colors.BLINK_GREEN + 
-                "\n\n\t\t\t\tWaiting for incoming data...\n\n" + 
-                Colors.NO_COLOUR, 
+                Colors.BLINK_GREEN +
+                "\n\n\t\t\t\tWaiting for incoming data...\n\n" +
+                Colors.NO_COLOUR,
                 flush   = True,
                 syslog  = False
         )
-
 
 def zipdir(path, ziph, **kwargs):
     """
@@ -1430,3 +1410,7 @@ def base64_process(**kwargs):
             'status':           True
             # 'decodedBytes':     bytes_decoded
         }
+
+
+restful_api.add_resource(HandleRequests, '/')
+
