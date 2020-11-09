@@ -106,7 +106,6 @@ class StoreHandler(BaseHTTPRequestHandler):
 
     def buffered_response(self, filePath):
         self.send_response(200)
-        self.end_headers()
         f = open(filePath, "rb")
         buf = 16*1024
         while 1:
@@ -185,7 +184,6 @@ class StoreHandler(BaseHTTPRequestHandler):
         }
 
         self.send_response(200)
-        self.end_headers()
 
         self.ret_client(d_ret)
         self.dp.qprint(d_ret, comms = 'tx')
@@ -335,7 +333,6 @@ class StoreHandler(BaseHTTPRequestHandler):
                 }
 
         self.send_error(401)
-        self.end_headers()
 
         self.ret_client(d_ret)
         self.dp.qprint(d_ret, comms = 'tx')
@@ -553,7 +550,6 @@ class StoreHandler(BaseHTTPRequestHandler):
                 b_status                        = True
         
         self.send_response(200)
-        self.end_headers()
 
         d_ret['User-agent'] = self.headers['user-agent']
 
@@ -1181,7 +1177,6 @@ class StoreHandler(BaseHTTPRequestHandler):
         )
 
         self.send_response(200)
-        self.end_headers()
 
         d_ret['User-agent'] = self.headers['user-agent']
 
@@ -1193,18 +1188,21 @@ class StoreHandler(BaseHTTPRequestHandler):
     def storeData(self, **kwargs):
         raise NotImplementedError('Abstract Method: Please implement this method in child class')
 
-    def ret_client(self, d_ret):
+    def ret_client(self, d_ret: dict):
         """
-        Simply "writes" the d_ret using json and the client wfile.
+        "Exit point" of the HTTP response.
+        ret_client should be the last method called during a response.
+        It constructs needed HTTP headers and then writes a JSON body.
 
-        :param d_ret:
-        :return:
+        :param d_ret: JSON payload
         """
         global Gd_internalvar
-        if not Gd_internalvar['httpResponse']:
-            self.wfile.write(json.dumps(d_ret).encode())
-        else:
-            self.wfile.write(str(Response(json.dumps(d_ret))).encode())
+        res = Response(json_body=d_ret)
+        if Gd_internalvar['httpResponse']:
+            for headerKey, headerValue in res.headerlist:
+                self.send_header(headerKey, headerValue)
+        self.end_headers()
+        self.wfile.write(res.body)
 
 
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
