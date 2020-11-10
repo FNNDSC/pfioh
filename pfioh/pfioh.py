@@ -3,10 +3,8 @@
 import logging
 logging.disable(logging.CRITICAL)
 
-import  sys
 import  stat
 
-from    io              import  BytesIO as IO
 from    http.server     import  BaseHTTPRequestHandler, HTTPServer
 from    socketserver    import  ThreadingMixIn
 from    webob           import  Response
@@ -22,15 +20,12 @@ import  datetime
 import  tempfile
 import  pprint
 import  time
-import  binascii
 
 import  platform
 import  socket
 import  psutil
 import  os
 import  multiprocessing
-import  inspect
-import  pudb
 import  inspect
 import  pfmisc
 from    pfmisc.Auth     import Auth
@@ -104,17 +99,21 @@ class StoreHandler(BaseHTTPRequestHandler):
             if str_comms == "rx":       print(Colors.GREEN  + "---->")
             print(Colors.NO_COLOUR, end="", flush=True)
 
-    def buffered_response(self, filePath):
+    def buffered_response(self, filePath, contenttype='application/zip'):
+        """
+        Respond to the HTTP request with a binary file.
+        """
         self.send_response(200)
+        self.send_header('content-type', contenttype)
+        self.send_header('content-length', os.path.getsize(filePath))
         self.end_headers()
-        f = open(filePath, "rb")
-        buf = 16*1024
-        while 1:
-            chunk = f.read(buf)
-            if not chunk:
-                break
-            self.wfile.write(chunk)
-        f.close()
+
+        with open(filePath, "rb") as f:
+            while 1:
+                chunk = f.read(16384)  # 16 * 1024
+                if not chunk:
+                    break
+                self.wfile.write(chunk)
 
 
     def remoteLocation_resolve(self, d_remote):
@@ -232,13 +231,10 @@ class StoreHandler(BaseHTTPRequestHandler):
                                 key         = d_remote['key'],
                                 d_ret       = d_ret
                             )
-        # TODO
+        d_ret['postop']      = self.do_GET_postop(d_meta)
+        self.dp.qprint(json.dumps(d_ret, indent=4), comms='tx')
         # self.getData calls StoreHandler.buffered_response
-        # which writes the body. so is ret_client doing anything here?
-        d_ret['postop']      = self.do_GET_postop(  meta          = d_meta)
-        self.ret_client(d_ret)
-        self.dp.qprint(json.dumps(d_ret, indent = 4), comms = 'tx')
-
+        # which writes the headers + body, so DON'T call self.ret_client
         return d_ret
 
     def getData(self, **kwargs):
@@ -1014,24 +1010,14 @@ class StoreHandler(BaseHTTPRequestHandler):
                 d_ls                    = self.ls_process(    request = dmsg_lstree)
                 self.dp.qprint("target ls = \n%s" % self.pp.pformat(d_ls).strip())
 
-    def do_GET_postop(self, **kwargs):
+    def do_GET_postop(self, d_meta):
         """
         Perform any post-operations relating to a "GET" / "PULL" request.
-
-        :param kwargs:
-        :return:
         """
 
-        str_cmd         = ''
-        d_meta          = {}
-        d_postop        = {}
         d_ret           = {}
         b_status        = False
-        str_path        = ''
         b_openshift     = False
-
-        for k,v in kwargs.items():
-            if k == 'meta':         d_meta          = v
 
         if 'serviceMan' in d_meta.keys():
             b_openshift = d_meta['serviceMan'] == 'openshift'
