@@ -106,6 +106,7 @@ class StoreHandler(BaseHTTPRequestHandler):
 
     def buffered_response(self, filePath):
         self.send_response(200)
+        self.end_headers()
         f = open(filePath, "rb")
         buf = 16*1024
         while 1:
@@ -231,6 +232,9 @@ class StoreHandler(BaseHTTPRequestHandler):
                                 key         = d_remote['key'],
                                 d_ret       = d_ret
                             )
+        # TODO
+        # self.getData calls StoreHandler.buffered_response
+        # which writes the body. so is ret_client doing anything here?
         d_ret['postop']      = self.do_GET_postop(  meta          = d_meta)
         self.ret_client(d_ret)
         self.dp.qprint(json.dumps(d_ret, indent = 4), comms = 'tx')
