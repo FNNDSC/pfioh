@@ -3,10 +3,8 @@
 import logging
 logging.disable(logging.CRITICAL)
 
-import  sys
 import  stat
 
-from    io              import  BytesIO as IO
 from    http.server     import  BaseHTTPRequestHandler, HTTPServer
 from    socketserver    import  ThreadingMixIn
 from    webob           import  Response
@@ -22,15 +20,12 @@ import  datetime
 import  tempfile
 import  pprint
 import  time
-import  binascii
 
 import  platform
 import  socket
 import  psutil
 import  os
 import  multiprocessing
-import  inspect
-import  pudb
 import  inspect
 import  pfmisc
 from    pfmisc.Auth     import Auth
@@ -104,17 +99,21 @@ class StoreHandler(BaseHTTPRequestHandler):
             if str_comms == "rx":       print(Colors.GREEN  + "---->")
             print(Colors.NO_COLOUR, end="", flush=True)
 
-    def buffered_response(self, filePath):
+    def buffered_response(self, filePath, contenttype='application/zip'):
+        """
+        Respond to the HTTP request with a binary file.
+        """
         self.send_response(200)
+        self.send_header('content-type', contenttype)
+        self.send_header('content-length', os.path.getsize(filePath))
         self.end_headers()
-        f = open(filePath, "rb")
-        buf = 16*1024
-        while 1:
-            chunk = f.read(buf)
-            if not chunk:
-                break
-            self.wfile.write(chunk)
-        f.close()
+
+        with open(filePath, "rb") as f:
+            while 1:
+                chunk = f.read(16384)  # 16 * 1024
+                if not chunk:
+                    break
+                self.wfile.write(chunk)
 
 
     def remoteLocation_resolve(self, d_remote):
@@ -185,7 +184,6 @@ class StoreHandler(BaseHTTPRequestHandler):
         }
 
         self.send_response(200)
-        self.end_headers()
 
         self.ret_client(d_ret)
         self.dp.qprint(d_ret, comms = 'tx')
@@ -233,10 +231,10 @@ class StoreHandler(BaseHTTPRequestHandler):
                                 key         = d_remote['key'],
                                 d_ret       = d_ret
                             )
-        d_ret['postop']      = self.do_GET_postop(  meta          = d_meta)
-        self.ret_client(d_ret)
-        self.dp.qprint(json.dumps(d_ret, indent = 4), comms = 'tx')
-
+        d_ret['postop']      = self.do_GET_postop(d_meta)
+        self.dp.qprint(json.dumps(d_ret, indent=4), comms='tx')
+        # self.getData calls StoreHandler.buffered_response
+        # which writes the headers + body, so DON'T call self.ret_client
         return d_ret
 
     def getData(self, **kwargs):
@@ -335,7 +333,6 @@ class StoreHandler(BaseHTTPRequestHandler):
                 }
 
         self.send_error(401)
-        self.end_headers()
 
         self.ret_client(d_ret)
         self.dp.qprint(d_ret, comms = 'tx')
@@ -553,7 +550,6 @@ class StoreHandler(BaseHTTPRequestHandler):
                 b_status                        = True
         
         self.send_response(200)
-        self.end_headers()
 
         d_ret['User-agent'] = self.headers['user-agent']
 
@@ -709,10 +705,10 @@ class StoreHandler(BaseHTTPRequestHandler):
 
         return d_msg
 
-    def do_POST(self, **kwargs):
+    def do_POST(self):
         isAuthorized, error = self.authorizeRequest()
         if isAuthorized:
-            return self.execute_POST(**kwargs)
+            return self.execute_POST()
         else:
             self.denyAuth()
 
@@ -824,7 +820,7 @@ class StoreHandler(BaseHTTPRequestHandler):
                 d_ret   = self.do_POST_withCopy(d_meta)
         return d_ret
 
-    def execute_POST(self, **kwargs):
+    def execute_POST(self):
         """
         The main logic for processing POST directives from the client.
 
@@ -832,47 +828,37 @@ class StoreHandler(BaseHTTPRequestHandler):
         as well as payload (i.e. data-mode or form-mode)
         directives .
         """
+        d_postParse = self.do_POST_dataParse()
 
-        b_skipInit  = False
-        d_msg       = {
-            'status':   False
-        }
-        d_postParse = {
-            'status':   False
-        }
-
-        for k,v in kwargs.items():
-            if k == 'd_msg':
-                d_msg       = v
-                b_skipInit  = True
-        
-        if not b_skipInit: 
-            d_postParse     = self.do_POST_dataParse()
-            try:
-                d_msg                   = d_postParse['d_data']
-            except:
-                d_msg['errorMessage']   = "No 'd_data' in postParse."
-
-        self.dp.qprint('d_msg = \n%s' % 
-                        json.dumps(
-                            d_msg, indent = 4
-                        ), comms = 'status')
-
-        if d_postParse['status']:
-            d_meta      = d_msg['meta']
-
-            if 'action' in d_msg and 'transport' not in d_meta:  
-                d_ret   = self.do_POST_actionParse(d_msg)
-
-            if 'ctl' in d_meta:
-                d_ret   = self.do_POST_serverctl(d_meta)
-
-            if 'transport' in d_meta:
-                d_ret   = self.do_POST_transportParse(d_meta, d_postParse)
-
-            if not b_skipInit: self.ret_client(d_ret)
+        if 'd_data' in d_postParse:
+            d_msg = d_postParse['d_data']
         else:
-            d_ret       = d_msg
+            d_msg = {
+                'errorMessage': "No 'd_data' in postParse."
+            }
+
+        self.dp.qprint(f'd_msg = \n{json.dumps(d_msg, indent=4)}', comms='status')
+
+        if not d_postParse['status'] and 'meta' in d_msg:
+            self.ret_client({
+                'status': False,
+                'msg': f'unable to handle request d_msg={d_msg}'
+            })
+            return d_msg
+
+        d_meta = d_msg['meta']
+        if 'ctl' in d_meta:
+            d_ret = self.do_POST_serverctl(d_meta)
+        elif 'transport' in d_meta:
+            d_ret = self.do_POST_transportParse(d_meta, d_postParse)
+        elif 'action' in d_msg:
+            d_ret = self.do_POST_actionParse(d_msg)
+        else:
+            d_ret = {
+                'status': False,
+                'msg': f'nothing to do for d_msg={d_msg}'
+            }
+        self.ret_client(d_ret)
         return d_ret
 
     def do_POST_serverctl(self, d_meta):
@@ -1014,24 +1000,14 @@ class StoreHandler(BaseHTTPRequestHandler):
                 d_ls                    = self.ls_process(    request = dmsg_lstree)
                 self.dp.qprint("target ls = \n%s" % self.pp.pformat(d_ls).strip())
 
-    def do_GET_postop(self, **kwargs):
+    def do_GET_postop(self, d_meta):
         """
         Perform any post-operations relating to a "GET" / "PULL" request.
-
-        :param kwargs:
-        :return:
         """
 
-        str_cmd         = ''
-        d_meta          = {}
-        d_postop        = {}
         d_ret           = {}
         b_status        = False
-        str_path        = ''
         b_openshift     = False
-
-        for k,v in kwargs.items():
-            if k == 'meta':         d_meta          = v
 
         if 'serviceMan' in d_meta.keys():
             b_openshift = d_meta['serviceMan'] == 'openshift'
@@ -1181,7 +1157,6 @@ class StoreHandler(BaseHTTPRequestHandler):
         )
 
         self.send_response(200)
-        self.end_headers()
 
         d_ret['User-agent'] = self.headers['user-agent']
 
@@ -1193,18 +1168,21 @@ class StoreHandler(BaseHTTPRequestHandler):
     def storeData(self, **kwargs):
         raise NotImplementedError('Abstract Method: Please implement this method in child class')
 
-    def ret_client(self, d_ret):
+    def ret_client(self, d_ret: dict):
         """
-        Simply "writes" the d_ret using json and the client wfile.
+        "Exit point" of the HTTP response.
+        ret_client should be the last method called during a response.
+        It constructs needed HTTP headers and then writes a JSON body.
 
-        :param d_ret:
-        :return:
+        :param d_ret: JSON payload
         """
         global Gd_internalvar
-        if not Gd_internalvar['httpResponse']:
-            self.wfile.write(json.dumps(d_ret).encode())
-        else:
-            self.wfile.write(str(Response(json.dumps(d_ret))).encode())
+        res = Response(json_body=d_ret)
+        if Gd_internalvar['httpResponse']:
+            for headerKey, headerValue in res.headerlist:
+                self.send_header(headerKey, headerValue)
+        self.end_headers()
+        self.wfile.write(res.body)
 
 
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
