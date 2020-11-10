@@ -705,10 +705,10 @@ class StoreHandler(BaseHTTPRequestHandler):
 
         return d_msg
 
-    def do_POST(self, **kwargs):
+    def do_POST(self):
         isAuthorized, error = self.authorizeRequest()
         if isAuthorized:
-            return self.execute_POST(**kwargs)
+            return self.execute_POST()
         else:
             self.denyAuth()
 
@@ -820,7 +820,7 @@ class StoreHandler(BaseHTTPRequestHandler):
                 d_ret   = self.do_POST_withCopy(d_meta)
         return d_ret
 
-    def execute_POST(self, **kwargs):
+    def execute_POST(self):
         """
         The main logic for processing POST directives from the client.
 
@@ -828,47 +828,37 @@ class StoreHandler(BaseHTTPRequestHandler):
         as well as payload (i.e. data-mode or form-mode)
         directives .
         """
+        d_postParse = self.do_POST_dataParse()
 
-        b_skipInit  = False
-        d_msg       = {
-            'status':   False
-        }
-        d_postParse = {
-            'status':   False
-        }
-
-        for k,v in kwargs.items():
-            if k == 'd_msg':
-                d_msg       = v
-                b_skipInit  = True
-        
-        if not b_skipInit: 
-            d_postParse     = self.do_POST_dataParse()
-            try:
-                d_msg                   = d_postParse['d_data']
-            except:
-                d_msg['errorMessage']   = "No 'd_data' in postParse."
-
-        self.dp.qprint('d_msg = \n%s' % 
-                        json.dumps(
-                            d_msg, indent = 4
-                        ), comms = 'status')
-
-        if d_postParse['status']:
-            d_meta      = d_msg['meta']
-
-            if 'action' in d_msg and 'transport' not in d_meta:  
-                d_ret   = self.do_POST_actionParse(d_msg)
-
-            if 'ctl' in d_meta:
-                d_ret   = self.do_POST_serverctl(d_meta)
-
-            if 'transport' in d_meta:
-                d_ret   = self.do_POST_transportParse(d_meta, d_postParse)
-
-            if not b_skipInit: self.ret_client(d_ret)
+        if 'd_data' in d_postParse:
+            d_msg = d_postParse['d_data']
         else:
-            d_ret       = d_msg
+            d_msg = {
+                'errorMessage': "No 'd_data' in postParse."
+            }
+
+        self.dp.qprint(f'd_msg = \n{json.dumps(d_msg, indent=4)}', comms='status')
+
+        if not d_postParse['status'] and 'meta' in d_msg:
+            self.ret_client({
+                'status': False,
+                'msg': f'unable to handle request d_msg={d_msg}'
+            })
+            return d_msg
+
+        d_meta = d_msg['meta']
+        if 'ctl' in d_meta:
+            d_ret = self.do_POST_serverctl(d_meta)
+        elif 'transport' in d_meta:
+            d_ret = self.do_POST_transportParse(d_meta, d_postParse)
+        elif 'action' in d_msg:
+            d_ret = self.do_POST_actionParse(d_msg)
+        else:
+            d_ret = {
+                'status': False,
+                'msg': f'nothing to do for d_msg={d_msg}'
+            }
+        self.ret_client(d_ret)
         return d_ret
 
     def do_POST_serverctl(self, d_meta):
