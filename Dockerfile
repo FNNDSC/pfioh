@@ -48,5 +48,5 @@ RUN pip3 install ${APPROOT}  \
 #USER localuser
 
 WORKDIR "/home/localuser"
-ENTRYPOINT ["pfioh"]
+ENTRYPOINT ["pfioh", "--forever", "--httpResponse", "--createDirsAsNeeded"]
 EXPOSE 5055

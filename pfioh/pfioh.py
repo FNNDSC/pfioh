@@ -302,41 +302,36 @@ class StoreHandler(BaseHTTPRequestHandler):
         """
         return
 
+    def authorizeRequest(self) -> bool:
+        """
+        Use pfmisc.Auth to authorize an incoming request.
+        If authorization is denied, a 401 error is sent.
+        :return: True if request is authorized
+        """
+        if not self.__b_tokenAuth:
+            return True
+
+        isAuthorized, error = self.__auth.authorizeClientRequest(self.headers)
+        if not isAuthorized:
+            self.send_error(401)
+            self.dp.qprint('unauthorized request, responding 401', comms = 'status')
+        return isAuthorized
+
     def do_GET(self):
-        isAuthorized, error = self.authorizeRequest()
-        if isAuthorized:
-            return self.execute_GET()
-        else:
-            self.denyAuth()
+        """
+        Dispatched by http.server.BaseHTTPRequestHandler.handle_one_request
+        to handle a HTTP GET request.
+        """
+        if self.authorizeRequest():
+            self.execute_GET()
 
-
-    def authorizeRequest(self):
-        # Authenticate user request if the server is started with the __b_tokenAuth private flag set to true
-        if self.__b_tokenAuth:
-            print('Authorizing client request...')
-            isAuthorized, error = self.__auth.authorizeClientRequest(self.headers)
-            if isAuthorized:
-                return (True, "")
-            else:
-                code, msg, explain = error
-                self.send_response(code, msg)
-                return (False, "%s %s %s" % (code, msg, explain))
-
-        # If not configured to authorize requests, allow all requests through
-        else:
-            return (True, "")
-
-    def denyAuth(self):
-        d_ret = {
-                "message": "Unauthorized Client Request",
-                'status': False
-                }
-
-        self.send_error(401)
-
-        self.ret_client(d_ret)
-        self.dp.qprint(d_ret, comms = 'tx')
-        return d_ret
+    def do_POST(self):
+        """
+        Dispatched by http.server.BaseHTTPRequestHandler.handle_one_request
+        to handle a HTTP POST request.
+        """
+        if self.authorizeRequest():
+            return self.execute_POST()
 
     def execute_GET(self):
         d_server            = dict(urllib.parse.parse_qsl(urllib.parse.urlsplit(self.path).query))
@@ -704,13 +699,6 @@ class StoreHandler(BaseHTTPRequestHandler):
             d_msg['errorMessage'] = "FORM reception possibly incomplete."
 
         return d_msg
-
-    def do_POST(self):
-        isAuthorized, error = self.authorizeRequest()
-        if isAuthorized:
-            return self.execute_POST()
-        else:
-            self.denyAuth()
 
     def do_POST_dataParse(self):
         """
