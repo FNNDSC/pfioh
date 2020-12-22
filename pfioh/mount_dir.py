@@ -133,8 +133,8 @@ class MountDir(StoreHandler):
                                     compression = zipfile.ZIP_DEFLATED
                                 ) as zipfileObj:
                 if not filePath_zipContents(str_localPath, zipfileObj):
-                    emptyDirWarningFile_create(str_warnPath)
-                    filePath_zipContents(str_warnPath, zipfileObj)
+                    emptyDirWarningFile_create(str_localPath)
+                    filePath_zipContents(str_localPath, zipfileObj)
         else:
             str_fileToProcess = os.walk(str_localPath).next()[2][0]
         d_ret['status'] = True
