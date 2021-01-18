@@ -1,6 +1,6 @@
-####################
-pfioh - v3.0.0.2
-####################
+##############
+pfioh - v3.0.1
+##############
 
 .. image:: https://badge.fury.io/py/pfioh.svg
     :target: https://badge.fury.io/py/pfioh

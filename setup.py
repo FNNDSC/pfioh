@@ -6,7 +6,7 @@ with open(path.join(path.abspath(path.dirname(__file__)), 'README.rst')) as f:
 
 setup(
     name             =   'pfioh',
-    version          =   '3.0.0.2',
+    version          =   '3.0.1',
     description      =   'Path-and-File-IO-over-HTTP',
     long_description =   readme,
     author           =   'Rudolph Pienaar',
