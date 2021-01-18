@@ -13,7 +13,7 @@ setup(
     author_email     =   'rudolph.pienaar@gmail.com',
     url              =   'https://github.com/FNNDSC/pfioh',
     packages         =   ['pfioh'],
-    install_requires =   ['webob', 'pudb', 'psutil', 'keystoneauth1', 'python-keystoneclient', 'python-swiftclient', 'pfmisc==2.0.2'],
+    install_requires =   ['webob', 'pudb', 'psutil', 'keystoneauth1', 'python-keystoneclient', 'python-swiftclient', 'pfmisc'],
     test_suite       =   'nose.collector',
     tests_require    =   ['nose'],
     scripts          =   ['bin/pfioh'],
