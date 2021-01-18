@@ -1,15 +1,11 @@
-FROM fnndsc/ubuntu-python3:latest
-LABEL MAINTAINER="dev@babymri.org"
-
-# pfurl dependencies
-RUN apt-get update \
-  && apt-get install -qq libssl-dev libcurl4-openssl-dev \
-  && rm -rf /var/lib/apt/lists/*
+# debian is preferred over alpine because in the strange
+# tree of dependencies, pfmisc depends on numpy
+FROM python:3.9.1-buster
+LABEL version="3.0.1" maintainer="FNNDSC <dev@babyMRI.org>" 
 
 WORKDIR /usr/local/src
 COPY . .
-
-RUN ["pip", "install", "."]
+RUN pip install .
 
 ENTRYPOINT ["pfioh"]
 CMD ["--forever", "--httpResponse", "--createDirsAsNeeded"]
