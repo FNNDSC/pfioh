@@ -16,83 +16,9 @@ Overview
 
 This repository provides ``pfioh`` -- a *server* process (think of it as anonymous ``ftp`` that natively understands recursive paths) that allows for file/path push/copy.
 
-pfioh
-=====
-
-``pfioh`` is a service that pushes/pulls files and directories between different locations.
-
-
-************
-Installation
-************
-
-Installation is relatively straightforward, and we recommend using either python virtual environments or docker.
-
-Python Virtual Environment
-==========================
-
-On Ubuntu, install the Python virtual environment creator
-
-.. code-block:: bash
-
-  sudo apt install virtualenv
-
-Then, create a directory for your virtual environments e.g.:
-
-.. code-block:: bash
-
-  mkdir ~/python-envs
-
-You might want to add to your .bashrc file these two lines:
-
-.. code-block:: bash
-
-    export WORKON_HOME=~/python-envs
-    source /usr/local/bin/virtualenvwrapper.sh
-
-Then you can source your .bashrc and create a new Python3 virtual environment:
-
-.. code-block:: bash
-
-    source .bashrc
-    mkvirtualenv --python=python3 python_env
-
-To activate or "enter" the virtual env:
-
-.. code-block:: bash
-
-    workon python_env
-
-To deactivate virtual env:
-
-.. code-block:: bash
-
-    deactivate
-
-Using the ``fnndsc/pfioh`` dock
-===============================
-
-The easiest option however, is to just use the ``fnndsc/pfioh`` dock.
-
-.. code-block:: bash
-
-    docker pull fnndsc/pfioh
-    
-and then run
-
-.. code-block:: bash
-
-    docker run --name pfioh -v /home:/Users --rm  \
-        fnndsc/pfioh                              \
-        --forever --httpResponse                  \
-        --storeBase=/tmp --createDirsAsNeeded
-
 *****
 Usage
 *****
-
-``pfioh`` usage
-===============
 
 For ``pfioh`` detailed information, see the `pfioh wiki page <https://github.com/FNNDSC/pfioh/wiki/pfioh-overview>`_.
 
@@ -147,22 +73,17 @@ For ``pfioh`` detailed information, see the `pfioh wiki page <https://github.com
         more fine tuned output control as opposed to '--quiet' that effectively
         silences everything.
 
-********
-EXAMPLES
-********
-
-Start ``pfioh`` in ``forever`` mode, accessible on localhost:
+*******
+Example
+*******
 
 .. code-block:: bash
 
-            pfioh                                                   \\
-                --forever                                           \\
-                --port 5055                                         \\
-                --storeBase=/tmp                                    \\
-                --httpResponse                                      \\
-                --createDirsAsNeeded                                \\
-                --verbosity 1                                       \\
-                --ip 127.0.0.1
-
-
-
+    docker run --rm --name pfioh  \
+        -v $PWD/base:/base        \
+        -p 5055:5055              \
+        fnndsc/pfioh:latest       \
+        --forever --httpResponse  \
+        --storeBase=/base         \
+        --createDirsAsNeeded      \
+        --port 5055
