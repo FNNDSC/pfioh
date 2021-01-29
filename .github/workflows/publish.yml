@@ -27,6 +27,13 @@ jobs:
           platforms: amd64,arm64,ppc64le
       - uses: docker/setup-buildx-action@v1
         id: buildx
+      - name: Cache Docker layers
+        uses: actions/cache@v2
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
       - name: Login to DockerHub
         uses: docker/login-action@v1 
         with:
@@ -35,8 +42,10 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v2
         with:
+          push: true
           context: .
           file: ./Dockerfile
-          platforms: ${{ steps.buildx.outputs.platforms }}
-          push: true
           tags: ${{ steps.resolve.outputs.tag }}
+          platforms: ${{ steps.buildx.outputs.platforms }}
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache
