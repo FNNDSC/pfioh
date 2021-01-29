@@ -1,12 +1,40 @@
-name: publish
+# Run nose tests and CUBE integration tests.
+# If both pass, build a multi-architectural docker image and push
+# it to Dockerhub. When the git ref is tagged, the docker image
+# will be tagged by the same name.
 
-on:
-  push:
-    branches: [ master ]
-    tags: ['**']
+name: ci
+
+on: [push, pull_request, release]
 
 jobs:
-  build:
+
+  tests-nose:
+    name: Nose tests
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+      - name: pip install
+        run: |
+          pip install -r requirements.txt
+          pip install .
+          pip install nose
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+      - name: nosetests
+        run: nosetests
+
+  tests-cube:
+    name: CUBE tests
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+      - run: docker build -t fnndsc/pfioh .
+      - uses: FNNDSC/cube-integration-action@v1
+
+
+  publish:
+    needs: [tests-nose, tests-cube]
+    if: github.ref == 'refs/heads/master' && (github.event_name == 'push' || github.event_name == 'release')
     runs-on: ubuntu-20.04
     steps:
       - name: Get git tag
