@@ -1,15 +1,12 @@
-##############
-pfioh - v3.0.1
-##############
+#####
+pfioh
+#####
 
-.. image:: https://badge.fury.io/py/pfioh.svg
-    :target: https://badge.fury.io/py/pfioh
+.. image:: https://img.shields.io/docker/v/fnndsc/pfioh
+    :target: https://hub.docker.com/r/fnndsc/pfioh
 
-.. image:: https://travis-ci.org/FNNDSC/pfioh.svg?branch=master
-    :target: https://travis-ci.org/FNNDSC/pfioh
-
-.. image:: https://img.shields.io/badge/python-3.5%2B-blue.svg
-    :target: https://badge.fury.io/py/pfioh
+.. image:: https://img.shields.io/github/license/fnndsc/pfioh
+    :target: https://github.com/FNNDSC/pfioh/blob/master/LICENSE
 
 .. contents:: Table of Contents
 
