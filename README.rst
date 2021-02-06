@@ -2,9 +2,9 @@
 pfioh
 #####
 
-.. image:: https://img.shields.io/docker/v/fnndsc/pfioh
+.. image:: https://img.shields.io/docker/v/fnndsc/pfioh?sort=semver
+    :alt: Docker Image Version
     :target: https://hub.docker.com/r/fnndsc/pfioh
-
 .. image:: https://img.shields.io/github/license/fnndsc/pfioh
     :target: https://github.com/FNNDSC/pfioh/blob/master/LICENSE
 
