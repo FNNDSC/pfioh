@@ -5,7 +5,14 @@
 
 name: ci
 
-on: [push, pull_request, release]
+on:
+  push:
+    branches: [ master ]
+    tags: [ '**' ]
+  pull_request:
+    branches: [ master ]
+  release:
+    types: [ created ]
 
 jobs:
 
@@ -41,14 +48,16 @@ jobs:
         id: git_info
         if: startsWith(github.ref, 'refs/tags/')
         run: echo "::set-output name=tag::${GITHUB_REF##*/}"
-      - name: Resolve image tags
-        id: resolve
+      - name: Determine image tags
+        id: determine
         env:
           git_tag: ${{ steps.git_info.outputs.tag }}
         run: |
-          dock_image="${GITHUB_REPOSITORY,,}"  # to lower case
+          repo="${GITHUB_REPOSITORY,,}"  # to lower case
           tag="${git_tag:-latest}"  # if build triggered by tag, use tag name
-          echo "::set-output name=tag::$dock_image:$tag"
+          echo "::set-output name=repo::$repo"
+          echo "::set-output name=tag::$tag"
+          echo "::set-output name=dock_image::$repo:$tag"
       - uses: actions/checkout@v2
       - uses: docker/setup-qemu-action@v1
       - uses: docker/setup-buildx-action@v1
@@ -71,7 +80,7 @@ jobs:
           push: true
           context: .
           file: ./Dockerfile
-          tags: ${{ steps.resolve.outputs.tag }}
+          tags: ${{ steps.determine.outputs.dock_image }}
           platforms: linux/amd64,linux/ppc64le,linux/arm64
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache
