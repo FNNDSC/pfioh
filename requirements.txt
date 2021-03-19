@@ -27,7 +27,7 @@ requests==2.25.1
 rfc3986==1.4.0
 six==1.15.0
 stevedore==3.3.0
-urllib3==1.26.2
+urllib3==1.26.3
 urwid==2.1.2
 WebOb==1.8.6
 wrapt==1.12.1
